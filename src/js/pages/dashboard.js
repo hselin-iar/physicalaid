@@ -97,7 +97,7 @@ export async function renderDashboard(container) {
       <div class="dashboard-greeting-col">
         <h1 class="user-greeting">
           <span>Good ${getTimeOfDay()},</span>
-          Warrior
+          ${user?.displayName?.split(' ')[0] || 'Warrior'}
         </h1>
       </div>
 

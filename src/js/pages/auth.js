@@ -15,7 +15,19 @@ export function renderLogin() {
     return;
   }
 
-  app.innerHTML = `
+  // Use a dedicated container so we don't wipe #app (which contains sidebar/main-content)
+  let authContainer = document.getElementById('auth-container');
+  if (!authContainer) {
+    authContainer = document.createElement('div');
+    authContainer.id = 'auth-container';
+    // Append to body to ensure it overlays everything
+    document.body.appendChild(authContainer);
+  }
+
+  // Ensure main app is hidden
+  document.getElementById('app')?.classList.add('hidden');
+
+  authContainer.innerHTML = `
     <div class="auth-page">
       <!-- Left Side: Hero (Desktop) -->
       <div class="auth-hero">

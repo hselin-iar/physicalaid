@@ -22,6 +22,13 @@ function resolveRoute() {
     const hash = window.location.hash || '#/';
     const path = hash.replace('#', '') || '/';
 
+    // Cleanup auth overlay if exists
+    const authContainer = document.getElementById('auth-container');
+    if (authContainer) {
+        authContainer.remove();
+        document.getElementById('app')?.classList.remove('hidden');
+    }
+
     // Auth guard — redirect to login if not authenticated
     const user = getCurrentUser();
     if (!user && !publicPages.includes(path)) {
