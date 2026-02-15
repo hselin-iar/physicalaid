@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="PhysicalAid — Your daily exercise & posture correction companion. Guided timer-based routines for structural body alignment." />
+  <title>PhysicalAid — Daily Posture & Exercise Reset</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Top navigation -->
+    <nav id="top-nav" class="top-nav">
+      <div class="nav-brand" onclick="window.location.hash='#/'">
+        <span class="brand-icon">⚡</span>
+        <span class="brand-text">PhysicalAid</span>
+      </div>
+      <div class="nav-links">
+        <a href="#/" class="nav-link" data-page="dashboard">
+          <span class="nav-icon">🏠</span><span class="nav-label">Home</span>
+        </a>
+        <a href="#/routines" class="nav-link" data-page="routines">
+          <span class="nav-icon">🏋️</span><span class="nav-label">Routines</span>
+        </a>
+        <a href="#/strength" class="nav-link" data-page="strength">
+          <span class="nav-icon">💪</span><span class="nav-label">Strength</span>
+        </a>
+        <a href="#/guides" class="nav-link" data-page="guides">
+          <span class="nav-icon">📐</span><span class="nav-label">Guides</span>
+        </a>
+        <a href="#/progress" class="nav-link" data-page="progress">
+          <span class="nav-icon">📈</span><span class="nav-label">Progress</span>
+        </a>
+        <a href="#/settings" class="nav-link" data-page="settings">
+          <span class="nav-icon">⚙️</span><span class="nav-label">Settings</span>
+        </a>
+      </div>
+    </nav>
+
+    <!-- Main content area -->
+    <main id="main-content" class="main-content">
+      <!-- Pages render here -->
+    </main>
+
+    <!-- Bottom nav for mobile -->
+    <nav id="bottom-nav" class="bottom-nav">
+      <a href="#/" class="bnav-item" data-page="dashboard">
+        <span class="bnav-icon">🏠</span><span class="bnav-label">Home</span>
+      </a>
+      <a href="#/routines" class="bnav-item" data-page="routines">
+        <span class="bnav-icon">🏋️</span><span class="bnav-label">Routines</span>
+      </a>
+      <a href="#/strength" class="bnav-item" data-page="strength">
+        <span class="bnav-icon">💪</span><span class="bnav-label">Strength</span>
+      </a>
+      <a href="#/progress" class="bnav-item" data-page="progress">
+        <span class="bnav-icon">📈</span><span class="bnav-label">Progress</span>
+      </a>
+      <a href="#/settings" class="bnav-item" data-page="settings">
+        <span class="bnav-icon">⚙️</span><span class="bnav-label">Settings</span>
+      </a>
+    </nav>
+  </div>
+
+  <!-- Player overlay (renders on top of everything) -->
+  <div id="player-overlay" class="player-overlay hidden"></div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
