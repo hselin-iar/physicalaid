@@ -34,7 +34,7 @@ export async function renderDashboard(container) {
 
   container.innerHTML = `
     <!-- Top Header (Breadcrumb + Profile) -->
-    <div class="flex items-center justify-between mb-8 animate-in">
+    <div class="flex items-center justify-between mb-8 animate-in" style="position: relative; z-index: 100;">
       <div style="font-size: var(--fs-md); font-weight: 500; color: var(--text-muted);">Home</div>
       <div class="flex gap-4" style="position: relative;">
         <button class="btn-icon" id="dashboard-notify">

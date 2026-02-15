@@ -25,7 +25,7 @@
   /* Text — Clarity */
   --text-primary: #ffffff;
   --text-secondary: rgba(255, 255, 255, 0.7);
-  --text-muted: rgba(255, 255, 255, 0.55);
+  --text-muted: rgba(255, 255, 255, 0.7);
   --text-accent: #a78bfa;
 
   /* Typography */
@@ -1434,7 +1434,7 @@ ol {
   display: flex;
   gap: var(--sp-6);
   align-items: flex-start;
-  opacity: 0.4;
+  opacity: 0.6;
   transition: opacity 0.5s ease;
 }
 
@@ -3487,4 +3487,94 @@ ol {
 
 .auth-footer a:hover {
   color: var(--accent-primary);
+}
+
+/* ========================================
+   Mobile Optimizations (< 768px)
+   ======================================== */
+@media (max-width: 768px) {
+
+  /* Dashboard Header Stacking */
+  .dashboard-top-row {
+    flex-wrap: wrap;
+    gap: var(--sp-4);
+  }
+
+  .dashboard-greeting-col {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .dashboard-gauge-col {
+    flex: 0 0 auto;
+  }
+
+  /* Force Heatmap to new row */
+  .dashboard-heatmap-col {
+    flex: 1 1 100%;
+    margin-top: var(--sp-4);
+    order: 3;
+    overflow-x: auto;
+    /* Hide scrollbar for cleaner look */
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .dashboard-heatmap-col::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Player Page Stack */
+  .player-body--split {
+    flex-direction: column-reverse;
+    /* Timer on top, Steps below */
+    gap: var(--sp-6);
+    padding-bottom: var(--sp-12);
+    align-items: center;
+  }
+
+  .player-panel-left,
+  .player-panel-right {
+    flex: none;
+    width: 100%;
+    padding: var(--sp-2);
+    text-align: center;
+  }
+
+  .player-panel-left {
+    align-items: center;
+  }
+
+  .player-steps {
+    text-align: left;
+    width: 100%;
+    padding: var(--sp-4);
+  }
+
+  /* Ensure Timer/Visual don't overflow */
+  .player-image-container img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* Responsive Timer Ring */
+  .timer-svg-ring {
+    height: auto;
+    max-width: 100%;
+    width: 240px;
+  }
+
+  /* Player Action Row: Stack Timer on top, Buttons below */
+  .player-action-row {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .player-action-row .timer-wrapper {
+    order: -1;
+    flex: 0 0 100%;
+    display: flex;
+    justify-content: center;
+    margin-bottom: var(--sp-4);
+  }
 }

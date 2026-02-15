@@ -149,7 +149,7 @@ function renderFlowDay(day, index, isToday, log, todayEntry) {
                     <span style="font-size: 1.2rem">${ex.emoji}</span>
                     <div style="font-weight: 700; font-size: 0.95rem; color: #fff">${ex.name}</div>
                   </div>
-                  <div class="text-muted" style="font-size: 0.75rem">3 × 8–12</div>
+                  <div class="text-muted" style="font-size: 0.75rem; white-space: nowrap;">3 × 8–12</div>
                 </div>
                 `;
   }).join('')}
