@@ -6,10 +6,10 @@ import { journeyTimeline } from '../data.js';
 import { getStreakData, getDailyLog, getStrengthSessionsThisWeek } from '../storage.js';
 import { renderHeatmapCard } from '../components/heatmap.js';
 
-export function renderProgress(container) {
-  const streak = getStreakData();
-  const dailyLog = getDailyLog();
-  const strengthSessions = getStrengthSessionsThisWeek();
+export async function renderProgress(container) {
+  const streak = await getStreakData();
+  const dailyLog = await getDailyLog();
+  const strengthSessions = await getStrengthSessionsThisWeek();
 
   // Determine user's journey phase
   const daysSinceStart = streak.longestStreak || streak.currentStreak || 0;
@@ -19,69 +19,79 @@ export function renderProgress(container) {
   else if (daysSinceStart >= 21) currentPhase = 1; // 3-4 weeks
 
   container.innerHTML = `
-    <div class="page-hero animate-in">
-      <h1 class="page-title"><span class="gradient-text">Progress</span> 📈</h1>
-      <p class="page-description">Track your journey. Remember: 90 days of discipline is all you need.</p>
+    <div class="mb-10 animate-in">
+      <h1 class="display-heading">Progress</h1>
+      <p class="text-muted" style="font-size: var(--fs-md)">Consistency is the only metric that matters.</p>
     </div>
 
-    <!-- Streak Stats -->
-    <div class="stats-row mb-8">
-      <div class="glass-card stat-card no-hover animate-in">
-        <div class="streak-display" style="justify-content: center">
-          <span class="streak-fire">🔥</span>
-          <div>
-            <div class="streak-number">${streak.currentStreak}</div>
-            <div class="streak-label">Current Streak</div>
-          </div>
-        </div>
+    <!-- Minimalist Stat Strip -->
+    <div class="stat-strip animate-in">
+      <div class="stat-unit">
+        <div class="stat-unit-label">Current Streak</div>
+        <div class="stat-unit-value" style="color: var(--text-accent)">🔥 ${streak.currentStreak} Days</div>
       </div>
-      <div class="glass-card stat-card no-hover animate-in">
-        <div class="stat-value">${streak.longestStreak}</div>
-        <div class="stat-label">Longest Streak</div>
+      <div class="stat-unit">
+        <div class="stat-unit-label">Longest Streak</div>
+        <div class="stat-unit-value">${streak.longestStreak}</div>
       </div>
-      <div class="glass-card stat-card no-hover animate-in">
-        <div class="stat-value">${Object.keys(dailyLog).length}</div>
-        <div class="stat-label">Total Active Days</div>
+      <div class="stat-unit">
+        <div class="stat-unit-label">Total Active</div>
+        <div class="stat-unit-value">${Object.keys(dailyLog).length}</div>
       </div>
-      <div class="glass-card stat-card no-hover animate-in">
-        <div class="stat-value">${strengthSessions.length}/3</div>
-        <div class="stat-label">Strength This Week</div>
+      <div class="stat-unit">
+        <div class="stat-unit-label">Strength/Wk</div>
+        <div class="stat-unit-value">${strengthSessions.length}/3</div>
       </div>
     </div>
 
-    <!-- Journey Timeline -->
-    <div class="glass-card no-hover mb-8 animate-in">
-      <h2 class="section-title mb-6" style="font-size: var(--fs-lg)">🗺️ Your Journey</h2>
-      <div class="timeline">
-        ${journeyTimeline.map((phase, i) => `
-          <div class="timeline-item">
-            <div class="timeline-dot ${i < currentPhase ? 'completed' : i === currentPhase ? 'active' : ''}"></div>
-            <div class="timeline-title">
-              ${phase.icon} Week ${phase.week} — ${phase.title}
-              ${i === currentPhase ? '<span class="badge badge-accent" style="margin-left: var(--sp-2)">You are here</span>' : ''}
-              ${i < currentPhase ? '<span class="badge badge-success" style="margin-left: var(--sp-2)">✓</span>' : ''}
+    <!-- Floating Journey Path -->
+    <div class="mb-12 animate-in">
+      <h2 class="flow-label mb-8">Evolution Path</h2>
+      <div class="journey-path">
+        ${journeyTimeline.map((phase, i) => {
+    const isActive = i === currentPhase;
+    const isCompleted = i < currentPhase;
+    let cls = '';
+    if (isActive) cls = 'active';
+    else if (isCompleted) cls = 'completed';
+
+    return `
+          <div class="journey-node ${cls}">
+            <div class="journey-marker">${isCompleted ? '✓' : phase.icon}</div>
+            <div style="flex: 1">
+              <div style="font-size: 0.7rem; font-weight: 800; color: var(--text-accent); text-transform: uppercase; margin-bottom: 2px;">
+                Week ${phase.week} ${isActive ? '• Current' : ''}
+              </div>
+              <h3 style="font-size: 1.2rem; font-weight: 800; margin-bottom: 4px;">${phase.title}</h3>
+              <p class="text-muted" style="font-size: 0.85rem">${phase.desc}</p>
             </div>
-            <div class="timeline-desc">${phase.desc}</div>
           </div>
-        `).join('')}
+        `;
+  }).join('')}
       </div>
     </div>
 
-    <!-- Calendar Heatmap -->
-    ${renderHeatmapCard(dailyLog, 52)}
+    <!-- Calendar Heatmap (Subtle integration) -->
+    <div class="mb-12 animate-in">
+      <h2 class="flow-label mb-6">Activity Rhythm</h2>
+      ${renderHeatmapCard(dailyLog, 52)}
+    </div>
 
-    <!-- Warning Signs -->
-    <div class="warning-panel animate-in">
-      <div class="warning-panel-title">⚠️ When to See a Professional</div>
-      <ul class="warning-list">
-        <li>• Pain during any exercise</li>
-        <li>• One shoulder noticeably lower than the other</li>
-        <li>• Chronic knee pain</li>
-        <li>• Numbness or tingling</li>
-      </ul>
-      <p class="mt-4" style="font-size: var(--fs-sm); color: var(--text-secondary)">
-        Otherwise, this is conditioning, not pathology. Keep going.
-      </p>
+    <!-- Warning Signs (Non-Boxy) -->
+    <div class="mt-12 mb-12 animate-in">
+      <h3 class="flow-label mb-6" style="color: var(--color-warning)">Professional Guidance</h3>
+      <div class="flex flex-direction-column gap-3">
+        <div class="text-muted" style="font-size: 0.85rem">Consult a specialist if you experience:</div>
+        <ul style="list-style: none; padding: 0; display: flex; flex-direction: column; gap: 8px;">
+          <li style="font-size: 0.85rem; display: flex; gap: 8px;"><span style="color: var(--color-warning)">•</span> Pain during movement</li>
+          <li style="font-size: 0.85rem; display: flex; gap: 8px;"><span style="color: var(--color-warning)">•</span> Visible structural asymmetry</li>
+          <li style="font-size: 0.85rem; display: flex; gap: 8px;"><span style="color: var(--color-warning)">•</span> Persistent joint discomfort</li>
+          <li style="font-size: 0.85rem; display: flex; gap: 8px;"><span style="color: var(--color-warning)">•</span> Neurological symptoms (numbness)</li>
+        </ul>
+        <p class="mt-4" style="font-size: 0.8rem; color: var(--text-muted); font-style: italic;">
+          Discipline overcomes minor discomfort. Pathology requires a physician.
+        </p>
+      </div>
     </div>
   `;
 }

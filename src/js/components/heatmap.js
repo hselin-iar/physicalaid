@@ -85,8 +85,8 @@ export function renderHeatmapCard(dailyLog, weeks = 20) { // Default 20 for dash
 
   return `
     <div class="glass-card no-hover animate-in heatmap-card">
-      <div class="heatmap-title mb-4">
-        <span class="section-title" style="font-size: var(--fs-sm)">Review</span>
+      <div class="heatmap-title mb-4" style="display: flex; justify-content: space-between; align-items: baseline;">
+        <span class="section-title" style="font-size: var(--fs-md); font-weight: 500;">Contribution Activity Heat Map</span>
         <span class="text-muted" style="font-size: var(--fs-xs)">${data.length} days</span>
       </div>
       
@@ -123,6 +123,37 @@ export function renderHeatmapCard(dailyLog, weeks = 20) { // Default 20 for dash
           <div class="heatmap-cell level-4"></div>
           <span>More</span>
         </div>
+      </div>
+    </div>
+  `;
+}
+
+export function renderMinimalHeatmap(dailyLog, weeks = 18) {
+  const { data } = getHeatmapData(dailyLog, weeks);
+  const cellsHtml = data.map(d =>
+    `<div class="heatmap-cell ${d.level}" title="${d.date}: ${d.count} routines"></div>`
+  ).join('');
+
+  return `
+    <div class="heatmap-minimal animate-in">
+      <div class="heatmap-top flex justify-between items-center mb-2">
+        <span style="font-size: 0.8rem; font-weight: 500; opacity: 0.7;">Contribution Activity Heat Map</span>
+        <span style="font-size: 0.7rem; opacity: 0.5;">${data.length} days</span>
+      </div>
+      <div class="heatmap-grid" style="grid-template-columns: repeat(${weeks}, 1fr);">
+        ${cellsHtml}
+      </div>
+      <div class="heatmap-footer mt-2 flex justify-between items-center">
+         <span style="font-size: 0.65rem; opacity: 0.4;">contribution Activity</span>
+         <div class="heatmap-legend flex gap-1 items-center">
+           <span style="font-size: 0.65rem; opacity: 0.4; margin-right: 4px;">Less</span>
+           <div class="heatmap-cell"></div>
+           <div class="heatmap-cell level-1"></div>
+           <div class="heatmap-cell level-2"></div>
+           <div class="heatmap-cell level-3"></div>
+           <div class="heatmap-cell level-4"></div>
+           <span style="font-size: 0.65rem; opacity: 0.4; margin-left: 4px;">More</span>
+         </div>
       </div>
     </div>
   `;

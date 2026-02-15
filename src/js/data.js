@@ -33,9 +33,8 @@ export const footArch = {
       sides: Sides.EACH,
       purpose: 'Arch + ankle stability',
       muscle: 'Feet & Ankles',
-      image: '/images/exercises/foot-arch.png',
-      emoji: '🦩',
       image: '/images/exercises/single-leg-stand.png',
+      emoji: '🦩',
       steps: [
         'Stand tall, feet hip-width apart',
         'Lift one foot off the ground',
@@ -268,7 +267,7 @@ export const upperBody = {
       sides: Sides.NONE,
       purpose: 'Shoulder decompression',
       muscle: 'Shoulders & Grip',
-      image: '/images/exercises/dead-hang.png',
+      image: '/images/exercises/pullups.png',
       emoji: '🐒',
       steps: [
         'Grab a pull-up bar with overhand grip',
@@ -353,7 +352,7 @@ export const nightMobility = {
       sides: Sides.EACH,
       purpose: 'Lengthen posterior chain',
       muscle: 'Hamstrings',
-      image: '/images/exercises/hamstring-stretch.png',
+      image: '/images/exercises/bulgarian_split_squats.png',
       emoji: '🦵',
       steps: [
         'Sit on the floor, one leg extended out',
@@ -407,15 +406,15 @@ export const gymPlan = {
       exercises: [
         {
           id: 'bench-press', name: 'Bench Press',
-          image: '/images/exercises/bench-press.png', emoji: '🏋️'
+          image: '/images/exercises/bench_press.png', emoji: '🏋️'
         },
         {
           id: 'overhead-press', name: 'Overhead Press',
-          image: '/images/exercises/overhead-press.png', emoji: '🏋️'
+          image: '/images/exercises/overload_press.png', emoji: '🏋️'
         },
         {
           id: 'tricep-dips', name: 'Tricep Dips',
-          image: '/images/exercises/tricep-dips.png', emoji: '💪'
+          image: '/images/exercises/tricep_dips.png', emoji: '💪'
         }
       ]
     },
@@ -431,7 +430,7 @@ export const gymPlan = {
         },
         {
           id: 'romanian-deadlifts', name: 'Romanian Deadlifts',
-          image: '/images/exercises/romanian-deadlifts.png', emoji: '🏋️'
+          image: '/images/exercises/romanian_deadlifts.png', emoji: '🏋️'
         },
         {
           id: 'calf-raises-gym', name: 'Calf Raises',
@@ -460,7 +459,7 @@ export const gymPlan = {
       exercises: [
         {
           id: 'pull-ups', name: 'Pull-ups / Lat Pulldown',
-          image: '/images/exercises/pull-ups.png', emoji: '🏋️'
+          image: '/images/exercises/pullups.png', emoji: '🏋️'
         },
         {
           id: 'rows', name: 'Rows',
@@ -468,11 +467,11 @@ export const gymPlan = {
         },
         {
           id: 'face-pulls', name: 'Face Pulls',
-          image: '/images/exercises/face-pulls.png', emoji: '🎯'
+          image: '/images/exercises/face_pulls.png', emoji: '🎯'
         },
         {
           id: 'bicep-curls', name: 'Bicep Curls',
-          image: '/images/exercises/bicep-curls.png', emoji: '💪'
+          image: '/images/exercises/bicep_curls.png', emoji: '💪'
         }
       ]
     },

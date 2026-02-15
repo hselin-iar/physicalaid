@@ -130,6 +130,10 @@ function updateUI(s) {
 }
 
 function renderRestUI(body, s, ex) {
+  const circumference = 2 * Math.PI * 120;
+  const progress = s.totalDuration > 0 ? (s.timeRemaining / s.totalDuration) : 1;
+  const dashoffset = circumference * (1 - progress);
+
   body.className = 'player-body player-body--center';
   body.innerHTML = `
     <div class="player-content-wrapper">
@@ -141,9 +145,23 @@ function renderRestUI(body, s, ex) {
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
           </button>
           
-          <div class="timer-ring big-timer" id="timer-wrapper" title="Click to Pause/Resume">
-            <div class="timer-value" id="timer-value">${s.timeRemaining}</div>
-            <div class="timer-label">seconds</div>
+          <div class="timer-ring" id="timer-wrapper" title="Click to Pause/Resume">
+            <svg class="timer-svg-ring" width="280" height="280" viewBox="0 0 260 260">
+              <circle cx="130" cy="130" r="120" fill="none" stroke="rgba(99, 102, 241, 0.1)" stroke-width="6" />
+              <circle class="timer-svg-progress" cx="130" cy="130" r="120" fill="none" stroke="url(#rest-gradient)" stroke-width="6" stroke-linecap="round"
+                stroke-dasharray="${circumference}" stroke-dashoffset="${dashoffset}"
+                transform="rotate(-90 130 130)" />
+              <defs>
+                <linearGradient id="rest-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#7c3aed" />
+                  <stop offset="100%" stop-color="#4f46e5" />
+                </linearGradient>
+              </defs>
+            </svg>
+            <div class="timer-ring-content">
+              <div class="timer-value" id="timer-value">${s.timeRemaining}</div>
+              <div class="timer-label">seconds</div>
+            </div>
           </div>
 
           <button class="player-nav-btn next" id="btn-next" title="Skip Rest">
@@ -160,7 +178,8 @@ function renderRestUI(body, s, ex) {
 
 function renderActiveUI(body, s, ex) {
   body.className = 'player-body player-body--split';
-  const sideBadge = ex.sideName ? `<span class="badge badge-accent">${ex.sideName} Side</span>` : '';
+  const sideInfo = ex.sideName ? `(${ex.sideName})` : '';
+
 
   /* Visual (Image or Emoji) */
   let visualHTML = '';
@@ -183,23 +202,55 @@ function renderActiveUI(body, s, ex) {
 
   /* Right Panel Meta */
   const metaHTML = `
-    <div class="player-exercise-name">${ex.name}</div>
-    ${sideBadge}
+    <h2 class="player-exercise-name">${ex.name} ${sideInfo}</h2>
     <div class="player-exercise-purpose">${ex.purpose}</div>
     <div class="player-set-indicator" id="set-indicator">
-      Exercise ${s.currentIndex + 1} of ${s.totalExercises} · Set ${s.currentSet} of ${s.totalSets}
+      Set ${s.currentSet} of ${s.totalSets} · Exercise ${s.currentIndex + 1}/${s.totalExercises}
     </div>
+
   `;
 
   let actionHTML = '';
   if (ex.type === ExType.TIMED) {
+    const circumference = 2 * Math.PI * 120;
+    const progress = s.totalDuration > 0 ? (s.timeRemaining / s.totalDuration) : 1;
+    const dashoffset = circumference * (1 - progress);
     actionHTML = `
-      <div class="timer-value" id="timer-value">${s.timeRemaining}</div>
-      <div class="timer-label">seconds</div>
+      <svg class="timer-svg-ring" width="280" height="280" viewBox="0 0 260 260">
+        <circle cx="130" cy="130" r="120" fill="none" stroke="rgba(99, 102, 241, 0.1)" stroke-width="6" />
+        <circle class="timer-svg-progress" cx="130" cy="130" r="120" fill="none" stroke="url(#timer-gradient)" stroke-width="6" stroke-linecap="round"
+          stroke-dasharray="${circumference}" stroke-dashoffset="${dashoffset}"
+          transform="rotate(-90 130 130)" />
+        <defs>
+          <linearGradient id="timer-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#7c3aed" />
+            <stop offset="100%" stop-color="#4f46e5" />
+          </linearGradient>
+        </defs>
+      </svg>
+      <div class="timer-ring-content">
+        <div class="timer-value" id="timer-value">${s.timeRemaining}</div>
+        <div class="timer-label">seconds</div>
+      </div>
     `;
   } else {
+    const circumference = 2 * Math.PI * 120;
+    const progress = s.targetReps > 0 ? (s.repCount / s.targetReps) : 0;
+    const dashoffset = circumference * (1 - progress);
     actionHTML = `
-      <div class="rep-counter">
+      <svg class="timer-svg-ring" width="280" height="280" viewBox="0 0 260 260">
+        <circle cx="130" cy="130" r="120" fill="none" stroke="rgba(99, 102, 241, 0.1)" stroke-width="6" />
+        <circle class="timer-svg-progress" cx="130" cy="130" r="120" fill="none" stroke="url(#rep-gradient)" stroke-width="6" stroke-linecap="round"
+          stroke-dasharray="${circumference}" stroke-dashoffset="${dashoffset}"
+          transform="rotate(-90 130 130)" />
+        <defs>
+          <linearGradient id="rep-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#7c3aed" />
+            <stop offset="100%" stop-color="#4f46e5" />
+          </linearGradient>
+        </defs>
+      </svg>
+      <div class="timer-ring-content">
         <div class="rep-value" id="rep-value">${s.repCount}</div>
         <div class="rep-target">of ${s.targetReps} reps</div>
         <button class="rep-btn" id="rep-tap">+1</button>
@@ -251,9 +302,23 @@ function updateValues(body, s, ex) {
   if (ex.type === ExType.TIMED || s.isResting) {
     const valEl = document.getElementById('timer-value');
     if (valEl) valEl.textContent = s.timeRemaining;
+    // Update SVG ring progress
+    const progressCircle = body.querySelector('.timer-svg-progress');
+    if (progressCircle && s.totalDuration > 0) {
+      const circumference = 2 * Math.PI * 120;
+      const progress = s.timeRemaining / s.totalDuration;
+      progressCircle.style.strokeDashoffset = circumference * (1 - progress);
+    }
   } else {
     const repEl = document.getElementById('rep-value');
     if (repEl) repEl.textContent = s.repCount;
+    // Update SVG ring progress for reps
+    const progressCircle = body.querySelector('.timer-svg-progress');
+    if (progressCircle && s.targetReps > 0) {
+      const circumference = 2 * Math.PI * 120;
+      const progress = s.repCount / s.targetReps;
+      progressCircle.style.strokeDashoffset = circumference * (1 - progress);
+    }
   }
 
   // Update Paused State Overlay

@@ -3,7 +3,7 @@
    ======================================== */
 
 import { ExType, Sides } from './data.js';
-import { getSettings, markCompleted, logDailyActivity } from './storage.js';
+import { getSettings, markCompleted } from './storage.js';
 import * as audio from './audio.js';
 
 let state = {
@@ -20,7 +20,8 @@ let state = {
     isResting: false,
     intervalId: null,
     onUpdate: null,      // callback for UI updates
-    onComplete: null     // callback when routine finishes
+    onComplete: null,    // callback when routine finishes
+    cachedSettings: null // settings cached at routine start
 };
 
 function getOverlay() {
@@ -43,7 +44,7 @@ function flattenExercises(exercises) {
 
 // Get effective duration for timed exercises (respects settings)
 function getEffectiveDuration(exercise) {
-    const settings = getSettings();
+    const settings = state.cachedSettings;
     if (exercise.id === 'plank' && settings.plankDuration) {
         return settings.plankDuration;
     }
@@ -51,8 +52,11 @@ function getEffectiveDuration(exercise) {
 }
 
 // ─── Start a routine ───
-export function startRoutine(routineId, exercises, onUpdate, onComplete) {
+export async function startRoutine(routineId, exercises, onUpdate, onComplete) {
     audio.initAudio();
+
+    // Cache settings at start to avoid async calls during timer ticks
+    const settings = await getSettings();
 
     const flat = flattenExercises(exercises);
 
@@ -70,7 +74,8 @@ export function startRoutine(routineId, exercises, onUpdate, onComplete) {
         isResting: false,
         intervalId: null,
         onUpdate,
-        onComplete
+        onComplete,
+        cachedSettings: settings
     };
 
     const overlay = getOverlay();
@@ -108,7 +113,7 @@ function startCurrentExercise() {
 
 function startTimer() {
     clearInterval(state.intervalId);
-    const settings = getSettings();
+    const settings = state.cachedSettings;
 
     state.intervalId = setInterval(() => {
         if (state.paused) return;
@@ -153,7 +158,7 @@ export function countRep() {
     const ex = state.exercises[state.currentIndex];
     if (ex.type !== ExType.REPS) return;
 
-    const settings = getSettings();
+    const settings = state.cachedSettings;
     state.repCount++;
     if (settings.soundEnabled) audio.playRepTap();
 
@@ -171,14 +176,14 @@ function handleSetComplete() {
         startRest();
     } else {
         // All sets done for this exercise
-        const settings = getSettings();
+        const settings = state.cachedSettings;
         if (settings.soundEnabled) audio.playExerciseComplete();
         advanceToNextExercise();
     }
 }
 
 function startRest() {
-    const settings = getSettings();
+    const settings = state.cachedSettings;
     state.isResting = true;
     state.timeRemaining = settings.restDuration;
     startTimer();
@@ -210,7 +215,7 @@ function advanceToNextExercise(immediate = false) {
         // Navigate immediately or with delay
         if (immediate) {
             if (state.running) {
-                const settings = getSettings();
+                const settings = state.cachedSettings;
                 if (settings.soundEnabled) audio.playStart();
                 startCurrentExercise();
             }
@@ -218,7 +223,7 @@ function advanceToNextExercise(immediate = false) {
             // Brief pause before next exercise (auto-advance)
             state.transitionTimeout = setTimeout(() => {
                 if (state.running) {
-                    const settings = getSettings();
+                    const settings = state.cachedSettings;
                     if (settings.soundEnabled) audio.playStart();
                     startCurrentExercise();
                 }
@@ -228,17 +233,20 @@ function advanceToNextExercise(immediate = false) {
     }
 }
 
-function finishRoutine() {
+async function finishRoutine() {
     clearInterval(state.intervalId);
     clearTimeout(state.transitionTimeout);
     state.running = false;
 
-    const settings = getSettings();
+    const settings = state.cachedSettings;
     if (settings.soundEnabled) audio.playRoutineComplete();
 
-    // Mark completed
-    markCompleted(state.routineId);
-    logDailyActivity();
+    // Mark completed with exercise metadata
+    const uniqueExercises = new Set(state.exercises.map(e => e.id)).size;
+    await markCompleted(state.routineId, {
+        exerciseCount: uniqueExercises,
+        type: 'routine'
+    });
 
     if (state.onComplete) {
         state.onComplete(state.routineId);
@@ -302,6 +310,16 @@ export function stopRoutine() {
 // ─── State Getters ───
 export function getState() {
     const ex = state.exercises[state.currentIndex] || null;
+
+    // Calculate total duration for progress ring
+    let totalDuration = 0;
+    if (state.isResting) {
+        const settings = state.cachedSettings;
+        totalDuration = settings ? settings.restDuration : 15;
+    } else if (ex && ex.type === ExType.TIMED) {
+        totalDuration = getEffectiveDuration(ex);
+    }
+
     return {
         running: state.running,
         paused: state.paused,
@@ -312,6 +330,7 @@ export function getState() {
         currentSet: state.currentSet,
         totalSets: state.totalSets,
         timeRemaining: state.timeRemaining,
+        totalDuration: totalDuration,
         repCount: state.repCount,
         targetReps: state.targetReps,
         isResting: state.isResting,

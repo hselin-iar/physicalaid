@@ -6,63 +6,83 @@ import { allRoutines, nightMobility, walkingProtocol, standingCheckpoint, ExType
 import { isCompletedToday } from '../storage.js';
 import { navigate } from '../router.js';
 
-export function renderRoutines(container) {
+export async function renderRoutines(container) {
   const allSections = [
-    { group: 'Daily Reset (15–20 min)', items: allRoutines },
+    { group: 'Daily Reset', items: allRoutines },
     { group: 'Quick Routines', items: [nightMobility] }
   ];
 
+  // Pre-resolve completion status for guide items
+  const walkingDone = await isCompletedToday('walking');
+  const standingDone = await isCompletedToday('standing');
+
+  // Pre-resolve completion for all routines
+  const sectionMarkup = [];
+  for (const section of allSections) {
+    const routineMarkup = [];
+    for (const routine of section.items) {
+      routineMarkup.push(await renderRoutineBoutique(routine));
+    }
+    sectionMarkup.push(`
+      <div class="mb-12 animate-in">
+        <h2 class="flow-label mb-6" style="font-size: 1rem; border-bottom: 1px solid var(--border-glass); padding-bottom: 0.5rem">
+          ${section.group}
+        </h2>
+        ${routineMarkup.join('')}
+      </div>
+    `);
+  }
+
   container.innerHTML = `
-    <div class="page-hero animate-in">
-      <h1 class="page-title"><span class="gradient-text">Routines</span></h1>
-      <p class="page-description">Your complete exercise library. Start any routine or view exercise details.</p>
+    <div class="mb-10 animate-in">
+      <h1 class="display-heading">Routines</h1>
+      <p class="text-muted" style="font-size: var(--fs-md)">Your complete body alignment library.</p>
     </div>
 
-    <!-- Full Daily Reset button -->
-    <div class="mb-8 animate-in">
-      <button class="btn btn-primary btn-lg w-full" id="btn-full-reset" style="justify-content: center; padding: var(--sp-5);">
-        🔄 Start Full Daily Reset (15–20 min)
-      </button>
+    <!-- Featured Master Routine -->
+    <div class="mb-12 animate-in">
+       <div class="routine-card-new" id="btn-full-reset" style="cursor:pointer; aspect-ratio: 21/7;">
+          <div class="card-image">
+            <img src="/images/exercises/thoracic_extension.png" style="opacity: 0.4">
+          </div>
+          <div class="card-content" style="padding: var(--sp-8)">
+            <div>
+              <div class="flow-label" style="color: #fff; opacity: 0.8;">Ultimate Alignment</div>
+              <h2 style="font-size: 2.2rem; font-weight: 800; color: #fff;">Full Daily Reset</h2>
+              <p class="text-muted" style="font-size: var(--fs-sm)">15–20 min • Complete structural overhaul</p>
+            </div>
+            <button class="btn-start-glass" style="padding: 1rem 2.5rem; font-size: 1rem;">▶ Start Master Routine</button>
+          </div>
+       </div>
     </div>
 
-    ${allSections.map(section => `
-      <div class="routine-block animate-in">
-        <div class="routine-header">
-          <h2 class="section-title">${section.group}</h2>
-        </div>
-        ${section.items.map(routine => renderRoutineSection(routine)).join('')}
-      </div>
-    `).join('')}
+    ${sectionMarkup.join('')}
 
-    <!-- Walking & Standing (guides) -->
-    <div class="routine-block animate-in">
-      <div class="routine-header">
-        <h2 class="section-title">Mindful Practice</h2>
-      </div>
-      <div class="grid-2 mb-6">
-        <div class="glass-card launch-card ${walkingProtocol.cardClass}" data-guide="walking" style="cursor:pointer">
-          <div class="launch-card-header">
-            <div class="launch-card-icon">${walkingProtocol.icon}</div>
+    <!-- Mindful Practice (Non-Boxy) -->
+    <div class="mb-12 animate-in">
+      <h2 class="flow-label mb-6" style="font-size: 1rem; border-bottom: 1px solid var(--border-glass); padding-bottom: 0.5rem">
+        Mindful Practice
+      </h2>
+      <div class="flex flex-direction-column gap-4">
+        <div class="flex items-center justify-between p-4" data-guide="walking" style="cursor:pointer; background: var(--bg-card); border-radius: 20px; border: 1px solid var(--border-glass);">
+          <div class="flex items-center gap-4">
+            <span style="font-size: 2rem">${walkingProtocol.icon}</span>
             <div>
-              <div class="launch-card-title">${walkingProtocol.title}</div>
-              <div class="launch-card-meta">${walkingProtocol.duration}</div>
+              <div style="font-weight: 700;">${walkingProtocol.title}</div>
+              <div class="text-muted" style="font-size: 0.75rem">${walkingProtocol.duration}</div>
             </div>
           </div>
-          <div class="launch-card-status">
-            ${isCompletedToday('walking') ? '<span class="badge badge-success">✓ Done</span>' : '<span class="badge">Open Guide</span>'}
-          </div>
+          ${walkingDone ? '<span class="badge badge-success">Done</span>' : '<span class="badge">Open Guide</span>'}
         </div>
-        <div class="glass-card launch-card ${standingCheckpoint.cardClass}" data-guide="standing" style="cursor:pointer">
-          <div class="launch-card-header">
-            <div class="launch-card-icon">${standingCheckpoint.icon}</div>
+        <div class="flex items-center justify-between p-4" data-guide="standing" style="cursor:pointer; background: var(--bg-card); border-radius: 20px; border: 1px solid var(--border-glass);">
+          <div class="flex items-center gap-4">
+            <span style="font-size: 2rem">${standingCheckpoint.icon}</span>
             <div>
-              <div class="launch-card-title">${standingCheckpoint.title}</div>
-              <div class="launch-card-meta">${standingCheckpoint.duration}</div>
+              <div style="font-weight: 700;">${standingCheckpoint.title}</div>
+              <div class="text-muted" style="font-size: 0.75rem">${standingCheckpoint.duration}</div>
             </div>
           </div>
-          <div class="launch-card-status">
-            ${isCompletedToday('standing') ? '<span class="badge badge-success">✓ Done</span>' : '<span class="badge">Open Guide</span>'}
-          </div>
+          ${standingDone ? '<span class="badge badge-success">Done</span>' : '<span class="badge">Open Guide</span>'}
         </div>
       </div>
     </div>
@@ -87,35 +107,35 @@ export function renderRoutines(container) {
   });
 }
 
-function renderRoutineSection(routine) {
-  const done = isCompletedToday(routine.id);
+async function renderRoutineBoutique(routine) {
+  const done = await isCompletedToday(routine.id);
   const exercises = routine.exercises || [];
 
   return `
-    <div class="glass-card no-hover mb-6">
-      <div class="flex items-center justify-between mb-4">
+    <div class="mb-10">
+      <div class="flex items-center justify-between mb-6">
         <div class="flex items-center gap-4">
-          <span style="font-size: var(--fs-2xl)">${routine.icon}</span>
           <div>
-            <div class="routine-title" style="margin-bottom: 0">${routine.title}</div>
-            <div class="launch-card-meta">${routine.duration} • ${exercises.length} exercises</div>
+            <h3 style="font-size: 1.3rem; font-weight: 900; margin: 0;">${routine.title}</h3>
+            <div class="text-muted" style="font-size: 0.75rem">${routine.duration} • ${exercises.length} exercises</div>
           </div>
         </div>
-        <div class="flex items-center gap-4">
-          ${done ? '<span class="badge badge-success">✓ Done</span>' : ''}
-          <button class="btn btn-primary start-routine-btn" data-id="${routine.id}">▶ Start</button>
-        </div>
+        <button class="btn-start-glass start-routine-btn" data-id="${routine.id}">▶ Start</button>
       </div>
-      <div class="exercise-grid">
+      
+      <!-- Horizontal Exercise Flow -->
+      <div class="horizontal-scroll-container" style="padding-right: 40px;">
         ${exercises.map((ex, i) => `
-          <div class="exercise-card">
-            <div class="exercise-card-top">
-              <span class="exercise-card-emoji">${ex.emoji}</span>
-              <span class="exercise-card-num">${i + 1}</span>
+          <div class="horizontal-item" style="background: var(--bg-card); padding: var(--sp-5); border-radius: 20px; border: 1px solid var(--border-glass); display: flex; flex-direction: column; justify-content: space-between; min-height: 140px;">
+            <div>
+              <div class="flex items-center gap-3 mb-3">
+                 <span style="font-size: 1.5rem">${ex.emoji}</span>
+                 <div style="font-weight: 700; font-size: 0.95rem; line-height: 1.2; color: #fff;">${ex.name}</div>
+              </div>
+              <div class="text-muted" style="font-size: 0.75rem; line-height: 1.4; margin-bottom: var(--sp-3)">${ex.purpose}</div>
             </div>
-            <div class="exercise-card-name">${ex.name}</div>
-            <div class="exercise-card-detail">
-              ${ex.sets} × ${ex.type === ExType.TIMED ? ex.duration + 's' : ex.reps + ' reps'}${ex.sides === Sides.EACH ? ' / side' : ''}
+            <div style="font-size: 0.7rem; font-weight: 800; color: var(--text-accent); text-transform: uppercase; letter-spacing: 0.05em;">
+              ${ex.sets} × ${ex.type === ExType.TIMED ? ex.duration + 's' : ex.reps + ' reps'}
             </div>
           </div>
         `).join('')}

@@ -5,54 +5,54 @@
 import { gymPlan } from '../data.js';
 import { getStrengthLog, saveStrengthEntry, getToday } from '../storage.js';
 
-export function renderStrength(container) {
-  const log = getStrengthLog();
+export async function renderStrength(container) {
+  const log = await getStrengthLog();
   const today = getToday();
   const todayEntry = log.find(e => e.date === today);
 
   // Figure out what day of the week it is
   const now = new Date();
   const dayIndex = now.getDay(); // 0=Sun, 1=Mon ... 6=Sat
-  // Map JS day to our gym plan days: Mon=0, Tue=1, Wed=2, Thu=3, Fri=4, Sat-Sun=5
   const gymDayMap = { 1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 0: 5, 6: 5 };
   const todayGymDay = gymDayMap[dayIndex];
 
   container.innerHTML = `
-    <div class="page-hero animate-in">
-      <h1 class="page-title"><span class="gradient-text">Gym Schedule</span> 🏆</h1>
-      <p class="page-description">${gymPlan.frequency} — ${gymPlan.note}</p>
+    <div class="mb-10 animate-in">
+      <h1 class="display-heading">Gym Flow</h1>
+      <p class="text-muted" style="font-size: var(--fs-md)">${gymPlan.frequency} — ${gymPlan.note}</p>
     </div>
 
-    <!-- Week Overview Tabs -->
-    <div class="strength-schedule mb-6 animate-in">
+    <!-- Week Overview Tabs (Subtle) -->
+    <div class="flex gap-2 mb-10 animate-in overflow-x-auto pb-2" style="scrollbar-width: none;">
       ${gymPlan.days.map((d, i) => {
     const dayDate = getGymDayDate(i);
     const isDone = log.some(e => e.date === dayDate);
     const isToday = i === todayGymDay;
-    let cls = '';
-    if (isDone) cls = 'completed';
-    else if (isToday) cls = 'active';
-    return `<div class="schedule-day ${cls}" data-gym-day="${i}" style="cursor:pointer">
-          ${d.emoji} ${d.dayShort}${isDone ? ' ✓' : isToday ? ' ←' : ''}
-        </div>`;
+    let style = `padding: 0.5rem 1rem; border-radius: 12px; font-weight: 600; font-size: 0.8rem; border: 1px solid var(--border-glass); transition: all 0.3s; white-space: nowrap;`;
+    if (isToday) style += `background: var(--accent-primary); color: white; border-color: var(--accent-primary);`;
+    else if (isDone) style += `opacity: 0.6;`;
+
+    return `<button class="schedule-tab" data-gym-day="${i}" style="${style}">
+          ${d.emoji} ${d.dayShort}${isDone ? ' ✓' : ''}
+        </button>`;
   }).join('')}
     </div>
 
-    <!-- Day Cards -->
-    <div id="gym-days-container">
-      ${gymPlan.days.map((d, i) => renderDayCard(d, i, i === todayGymDay, log, todayEntry)).join('')}
+    <!-- Session Flow (Zigzag) -->
+    <div class="zigzag-container animate-in">
+      ${gymPlan.days.map((d, i) => renderFlowDay(d, i, i === todayGymDay, log, todayEntry)).join('')}
     </div>
 
-    <!-- Specific Tips -->
-    <div class="glass-card no-hover mb-6 animate-in">
-      <h3 class="section-title mb-4" style="font-size: var(--fs-md)">🎯 For Your Specific Issues</h3>
-      <div class="checklist">
+    <!-- Specific Tips (Non-Boxy) -->
+    <div class="mt-12 mb-12 animate-in p-6" style="background: rgba(255,255,255,0.02); border-radius: 24px; border: 1px solid var(--border-glass);">
+      <h3 class="flow-label mb-6">Specific Cues</h3>
+      <div class="flex flex-direction-column gap-5">
         ${gymPlan.specificTips.map(tip => `
-          <div class="checklist-item">
-            <div class="check-icon" style="border-color: var(--color-warning); font-size: 0.6rem;">!</div>
-            <div>
-              <span style="font-weight: var(--fw-semibold); color: var(--color-warning);">${tip.label}:</span>
-              <span class="text-secondary" style="font-size: var(--fs-sm)"> ${tip.tip}</span>
+          <div class="flex items-start gap-4">
+            <div style="color: var(--color-warning); font-weight: 800; font-size: 1.2rem; line-height: 1;">!</div>
+            <div style="flex: 1">
+              <div style="color: #fff; font-weight: 700; font-size: 0.9rem; margin-bottom: 2px;">${tip.label}</div>
+              <div style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.4;">${tip.tip}</div>
             </div>
           </div>
         `).join('')}
@@ -60,27 +60,29 @@ export function renderStrength(container) {
     </div>
 
     <!-- Recent History -->
-    <div class="glass-card no-hover animate-in">
-      <h3 class="section-title mb-4" style="font-size: var(--fs-md)">📊 Recent Sessions</h3>
-      ${log.length === 0
+    <div class="animate-in pb-12">
+      <h3 class="flow-label mb-6">Past Sessions</h3>
+      <div style="margin-top: var(--sp-4)">
+        ${log.length === 0
       ? '<p class="text-muted">No sessions logged yet. Start today!</p>'
       : renderHistory(log)
     }
+      </div>
     </div>
   `;
 
   // Tab switching: scroll to day
-  container.querySelectorAll('.schedule-day[data-gym-day]').forEach(tab => {
+  container.querySelectorAll('.schedule-tab').forEach(tab => {
     tab.addEventListener('click', () => {
       const dayIdx = tab.dataset.gymDay;
-      const card = container.querySelector(`#gym-day-${dayIdx}`);
-      if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const el = container.querySelector(`#gym-day-${dayIdx}`);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   });
 
   // Save buttons
   container.querySelectorAll('.btn-save-day').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       const dayKey = btn.dataset.dayKey;
       const exercises = {};
       container.querySelectorAll(`.log-input[data-day="${dayKey}"]`).forEach(input => {
@@ -90,128 +92,100 @@ export function renderStrength(container) {
         exercises[exId][field] = parseInt(input.value) || 0;
       });
 
-      // Merge with today's entry
       const currentEntry = todayEntry?.exercises || {};
       const merged = { ...currentEntry };
-      // Store under the day focus name as prefix
       Object.entries(exercises).forEach(([exId, data]) => {
         merged[exId] = data;
       });
 
-      saveStrengthEntry(merged);
+      await saveStrengthEntry(merged);
 
-      // Visual feedback
-      btn.textContent = '✓ Saved!';
-      btn.classList.remove('btn-primary');
-      btn.classList.add('btn-success');
-      setTimeout(() => {
-        btn.textContent = '💾 Save';
-        btn.classList.remove('btn-success');
-        btn.classList.add('btn-primary');
-      }, 2000);
+      btn.textContent = '✓ Saved';
+      setTimeout(() => btn.textContent = 'Save Session', 2000);
     });
   });
 }
 
-function renderDayCard(day, index, isToday, log, todayEntry) {
+function renderFlowDay(day, index, isToday, log, todayEntry) {
   const dayDate = getGymDayDate(index);
   const dayLog = log.find(e => e.date === dayDate);
   const isDone = !!dayLog;
 
-  if (day.isRest) {
-    return `
-      <div class="glass-card no-hover mb-4 animate-in" id="gym-day-${index}" style="opacity: 0.7;">
-        <div class="flex items-center gap-4">
-          <span style="font-size: var(--fs-2xl)">${day.emoji}</span>
-          <div>
-            <div style="font-size: var(--fs-md); font-weight: var(--fw-semibold);">${day.day} — ${day.focus}</div>
-            <div class="text-muted" style="font-size: var(--fs-sm)">${day.note || 'Recovery day'}</div>
-          </div>
-          ${isToday ? '<span class="badge badge-accent" style="margin-left: auto;">Today</span>' : ''}
-        </div>
-      </div>
-    `;
-  }
+  // Map each day focus to a representative hero image
+  const heroImages = {
+    'Upper Push': '/images/exercises/bench_press.png',
+    'Lower Body': '/images/exercises/squats.png',
+    'Rest / Posture Work': '/images/exercises/thoracic_extension.png',
+    'Upper Pull': '/images/exercises/pullups.png',
+    'Rest': '/images/exercises/wall_angel.png',
+  };
+  // For Friday's second Lower Body, use deadlifts
+  const heroImage = index === 4 ? '/images/exercises/deadlifts.png' : (heroImages[day.focus] || '/images/exercises/wall_angel.png');
 
   return `
-    <div class="glass-card no-hover mb-4 animate-in ${isToday ? '' : ''}" id="gym-day-${index}" 
-         style="${isToday ? 'border-color: rgba(99, 102, 241, 0.4); box-shadow: 0 0 15px rgba(99, 102, 241, 0.1);' : ''}">
+    <div class="zigzag-item ${isToday ? 'active' : ''}" id="gym-day-${index}">
+      <div class="zigzag-marker"></div>
       
-      <div class="flex items-center justify-between mb-4">
-        <div class="flex items-center gap-4">
-          <span style="font-size: var(--fs-2xl)">${day.emoji}</span>
-          <div>
-            <div style="font-size: var(--fs-md); font-weight: var(--fw-bold);">${day.day}</div>
-            <div class="text-accent" style="font-size: var(--fs-sm)">${day.focus}</div>
-          </div>
+      <div class="zigzag-content">
+        <div class="flex flex-direction-column gap-2 mb-4">
+          <div class="flow-label" style="font-size: 0.7rem;">${day.day} ${isToday ? '• Today' : ''} ${isDone ? '• Complete' : ''}</div>
+          <h2 style="font-size: 1.5rem; font-weight: 900; color: #fff; margin: 0; text-transform: uppercase; letter-spacing: 0.05em;">
+            ${day.focus}
+          </h2>
         </div>
-        <div class="flex items-center gap-4">
-          ${isToday ? '<span class="badge badge-accent">Today</span>' : ''}
-          ${isDone ? '<span class="badge badge-success">✓ Logged</span>' : ''}
-        </div>
-      </div>
 
-      <!-- Exercise Grid -->
-      <div class="exercise-grid mb-4">
-        ${day.exercises.map((ex, i) => `
-          <div class="exercise-card">
-            <div class="exercise-card-top">
-              <span class="exercise-card-emoji">${ex.emoji}</span>
-              <span class="exercise-card-num">${i + 1}</span>
-            </div>
-            <div class="exercise-card-name">${ex.name}</div>
-            <div class="exercise-card-detail">3 × 8–12 reps</div>
+        ${day.isRest ? `
+          <div style="background: var(--bg-card); padding: var(--sp-6); border-radius: 24px; border: 1px solid var(--border-glass);">
+             <p class="text-muted" style="font-size: 0.9rem; margin: 0;">${day.note || 'Recovery day'}</p>
           </div>
-        `).join('')}
-      </div>
-
-      <!-- Logging Form (only show for today or expand on click) -->
-      ${isToday ? `
-        <div style="border-top: 1px solid var(--border-glass); padding-top: var(--sp-4);">
-          <div class="flex items-center justify-between mb-4">
-            <span style="font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-secondary);">Log Today's Progress</span>
-            <button class="btn btn-primary btn-save-day" data-day-key="${day.focus}">💾 Save</button>
-          </div>
-          <table class="log-table">
-            <thead>
-              <tr>
-                <th>Exercise</th>
-                <th>Weight (kg)</th>
-                <th>Reps</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${day.exercises.map(ex => {
+        ` : `
+          <div style="background: var(--bg-card); padding: var(--sp-6); border-radius: 24px; border: 1px solid var(--border-glass);">
+            <div class="flex flex-direction-column gap-5">
+              ${day.exercises.map((ex, i) => {
     const saved = todayEntry?.exercises?.[ex.id] || {};
     return `
-                  <tr>
-                    <td>${ex.emoji} ${ex.name}</td>
-                    <td><input type="number" class="log-input" data-day="${day.focus}" data-exercise="${ex.id}" data-field="weight" value="${saved.weight || ''}" placeholder="0"></td>
-                    <td><input type="number" class="log-input" data-day="${day.focus}" data-exercise="${ex.id}" data-field="reps" value="${saved.reps || ''}" placeholder="0"></td>
-                  </tr>
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-3">
+                    <span style="font-size: 1.2rem">${ex.emoji}</span>
+                    <div style="font-weight: 700; font-size: 0.95rem; color: #fff">${ex.name}</div>
+                  </div>
+                  <div class="text-muted" style="font-size: 0.75rem">3 × 8–12</div>
+                </div>
                 `;
   }).join('')}
-            </tbody>
-          </table>
-        </div>
-      ` : ''}
+            </div>
+
+            ${isToday ? `
+              <div class="mt-8 pt-6" style="border-top: 1px solid var(--border-glass)">
+                <button class="btn-start-glass btn-save-day w-full" data-day-key="${day.focus}">
+                  Save Session
+                </button>
+              </div>
+            ` : ''}
+          </div>
+        `}
+      </div>
+
+      <div class="zigzag-image">
+        <img src="${heroImage}" alt="${day.focus}">
+      </div>
     </div>
   `;
 }
 
 function renderHistory(log) {
-  const recent = log.slice(-5).reverse();
+  const recent = log.slice(-3).reverse();
   return `
-    <div class="exercise-list">
+    <div class="flex flex-direction-column gap-4">
       ${recent.map(entry => `
-        <div class="exercise-item" style="flex-direction: column; align-items: flex-start;">
-          <div class="flex items-center gap-4 w-full">
-            <span class="badge">${entry.date}</span>
+        <div class="flex flex-direction-column gap-1" style="padding: var(--sp-4); border-radius: 16px; background: var(--bg-card); border: 1px solid var(--border-glass);">
+          <div class="flex items-center justify-between">
+            <span style="font-weight: 700; font-size: 0.8rem;">${entry.date}</span>
           </div>
-          <div class="flex gap-4" style="flex-wrap: wrap; margin-top: var(--sp-2);">
+          <div class="flex gap-3 flex-wrap">
             ${Object.entries(entry.exercises || {}).map(([id, data]) => `
-              <span class="text-muted" style="font-size: var(--fs-xs)">
-                ${id}: ${data.weight || 0}kg × ${data.reps || 0}r
+              <span class="text-muted" style="font-size: 0.65rem">
+                ${id.split('-').map(w => w[0]).join('').toUpperCase()}: ${data.weight || 0}kg × ${data.reps || 0}r
               </span>
             `).join('')}
           </div>
@@ -222,7 +196,6 @@ function renderHistory(log) {
 }
 
 function getGymDayDate(gymDayIndex) {
-  // gymDayIndex: 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat-Sun
   const now = new Date();
   const currentDay = now.getDay(); // 0=Sun
   const mondayOffset = currentDay === 0 ? -6 : 1 - currentDay;
@@ -234,7 +207,6 @@ function getGymDayDate(gymDayIndex) {
     target.setDate(monday.getDate() + gymDayIndex);
     return target.toISOString().split('T')[0];
   } else {
-    // Saturday
     const target = new Date(monday);
     target.setDate(monday.getDate() + 5);
     return target.toISOString().split('T')[0];

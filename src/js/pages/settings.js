@@ -4,10 +4,10 @@
 
 import { getSettings, saveSettings } from '../storage.js';
 
-export function renderSettings(container) {
-    const settings = getSettings();
+export async function renderSettings(container) {
+  const settings = await getSettings();
 
-    container.innerHTML = `
+  container.innerHTML = `
     <div class="page-hero animate-in">
       <h1 class="page-title"><span class="gradient-text">Settings</span> ⚙️</h1>
       <p class="page-description">Customize your exercise experience.</p>
@@ -93,43 +93,45 @@ export function renderSettings(container) {
     </div>
   `;
 
-    // Auto-save on change
-    container.querySelectorAll('.setting-select').forEach(select => {
-        select.addEventListener('change', () => {
-            const key = select.dataset.key;
-            const val = parseInt(select.value);
-            const s = getSettings();
-            s[key] = val;
-            saveSettings(s);
-            showSaved(select);
-        });
+  // Auto-save on change
+  container.querySelectorAll('.setting-select').forEach(select => {
+    select.addEventListener('change', async () => {
+      const key = select.dataset.key;
+      const val = parseInt(select.value);
+      const s = await getSettings();
+      s[key] = val;
+      await saveSettings(s);
+      showSaved(select);
     });
+  });
 
-    container.querySelector('#setting-sound')?.addEventListener('change', (e) => {
-        const s = getSettings();
-        s.soundEnabled = e.target.checked;
-        saveSettings(s);
-    });
+  container.querySelector('#setting-sound')?.addEventListener('change', async (e) => {
+    const s = await getSettings();
+    s.soundEnabled = e.target.checked;
+    await saveSettings(s);
+  });
 
-    container.querySelector('#btn-clear-data')?.addEventListener('click', () => {
-        if (confirm('Clear all PhysicalAid data? This will reset your streaks, logs, and settings.')) {
-            localStorage.clear();
-            window.location.reload();
-        }
-    });
+  container.querySelector('#btn-clear-data')?.addEventListener('click', async () => {
+    if (confirm('Clear all PhysicalAid data? This will reset your streaks, logs, and settings.')) {
+      const { signOutUser } = await import('../firebase.js');
+      await signOutUser();
+      localStorage.clear();
+      window.location.reload();
+    }
+  });
 }
 
 function showSaved(element) {
-    const row = element.closest('.setting-row');
-    if (!row) return;
-    const existing = row.querySelector('.save-indicator');
-    if (existing) existing.remove();
+  const row = element.closest('.setting-row');
+  if (!row) return;
+  const existing = row.querySelector('.save-indicator');
+  if (existing) existing.remove();
 
-    const indicator = document.createElement('span');
-    indicator.className = 'save-indicator badge badge-success';
-    indicator.textContent = '✓ Saved';
-    indicator.style.marginLeft = 'var(--sp-2)';
-    row.appendChild(indicator);
+  const indicator = document.createElement('span');
+  indicator.className = 'save-indicator badge badge-success';
+  indicator.textContent = '✓ Saved';
+  indicator.style.marginLeft = 'var(--sp-2)';
+  row.appendChild(indicator);
 
-    setTimeout(() => indicator.remove(), 1500);
+  setTimeout(() => indicator.remove(), 1500);
 }

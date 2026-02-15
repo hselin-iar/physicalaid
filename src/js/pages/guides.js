@@ -3,14 +3,14 @@
    ======================================== */
 
 import { walkingProtocol, standingCheckpoint, sittingRules, sleepingPosition } from '../data.js';
-import { markCompleted, isCompletedToday, logDailyActivity, getSettings } from '../storage.js';
+import { markCompleted, isCompletedToday, getSettings } from '../storage.js';
 import * as audio from '../audio.js';
 
-export function renderGuides(container, subPage) {
+export async function renderGuides(container, subPage) {
   if (subPage === 'walking') {
-    renderWalkingGuide(container);
+    await renderWalkingGuide(container);
   } else if (subPage === 'standing') {
-    renderStandingGuide(container);
+    await renderStandingGuide(container);
   } else {
     renderGuidesOverview(container);
   }
@@ -18,84 +18,82 @@ export function renderGuides(container, subPage) {
 
 function renderGuidesOverview(container) {
   container.innerHTML = `
-    <div class="page-hero animate-in">
-      <h1 class="page-title"><span class="gradient-text">Posture Guides</span> 📐</h1>
-      <p class="page-description">Reference guides for sitting, sleeping, walking, and standing. Build awareness into every position.</p>
+    <div class="mb-10 animate-in">
+      <h1 class="display-heading">Posture Guides</h1>
+      <p class="text-muted" style="font-size: var(--fs-md)">Reference protocols for the other 23 hours of the day.</p>
     </div>
 
-    <div class="grid-2 mb-8">
-      <!-- Walking Protocol -->
-      <div class="glass-card launch-card walking animate-in" data-guide="walking" style="cursor:pointer">
-        <div class="launch-card-header">
-          <div class="launch-card-icon">🚶</div>
+    <!-- Immersive Guide Launchers -->
+    <div class="flex gap-4 mb-12 animate-in">
+      <div class="routine-card-new" data-guide="walking" style="cursor:pointer; flex: 1 1 0; min-width: 0; height: 200px; border-radius: 20px;">
+          <div class="card-image"><img src="/images/exercises/glute_bridges.png" style="opacity: 0.2"></div>
+          <div class="card-content" style="padding: var(--sp-6);">
+            <div style="margin-bottom: var(--sp-2)">
+              <div class="flow-label" style="color:#fff; font-size: 0.65rem; opacity: 0.7;">Movement</div>
+              <h2 style="font-size: 1.4rem; font-weight: 900; color:#fff; line-height: 1.15;">Walking Protocol</h2>
+            </div>
+            <button class="btn-start-glass" style="padding: 0.5rem 1.2rem; font-size: 0.8rem;">▶ Open</button>
+          </div>
+      </div>
+      <div class="routine-card-new" data-guide="standing" style="cursor:pointer; flex: 1 1 0; min-width: 0; height: 200px; border-radius: 20px;">
+          <div class="card-image"><img src="/images/exercises/plank.png" style="opacity: 0.2"></div>
+          <div class="card-content" style="padding: var(--sp-6);">
+            <div style="margin-bottom: var(--sp-2)">
+              <div class="flow-label" style="color:#fff; font-size: 0.65rem; opacity: 0.7;">Alignment</div>
+              <h2 style="font-size: 1.4rem; font-weight: 900; color:#fff; line-height: 1.15;">Standing Checkpoint</h2>
+            </div>
+            <button class="btn-start-glass" style="padding: 0.5rem 1.2rem; font-size: 0.8rem;">▶ Open</button>
+          </div>
+      </div>
+    </div>
+
+    <!-- Sitting Rules + Sleeping Position (Side-by-Side) -->
+    <div class="flex gap-8 mb-12 animate-in" style="align-items: flex-start;">
+      <div style="flex: 1 1 0; min-width: 0;">
+        <h2 class="flow-label mb-6" style="font-size: 1.2rem; font-weight: 900; border-bottom: 1px solid var(--border-glass); padding-bottom: 0.5rem">
+          🪑 Sitting Rules
+        </h2>
+        <div class="flex flex-direction-column gap-3 mb-4">
+          ${sittingRules.rules.map(rule => `
+            <div class="flex items-start gap-3 p-3" style="background: var(--bg-card); border-radius: 14px; border: 1px solid var(--border-glass);">
+              <span style="color: var(--accent-primary); font-weight: 800;">✓</span>
+              <span style="font-size: 0.85rem; font-weight: 600;">${rule}</span>
+            </div>
+          `).join('')}
+        </div>
+        <div class="p-3" style="border-radius: 14px; background: rgba(234, 179, 8, 0.05); border: 1px solid rgba(234, 179, 8, 0.2);">
+          <div style="color: var(--color-warning); font-weight: 800; font-size: 0.65rem; text-transform: uppercase; margin-bottom: 4px;">⚠️ Reset Rule</div>
+          <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">${sittingRules.reset}</p>
+        </div>
+      </div>
+
+      <div style="flex: 1 1 0; min-width: 0;">
+        <h2 class="flow-label mb-6" style="font-size: 1.2rem; font-weight: 900; border-bottom: 1px solid var(--border-glass); padding-bottom: 0.5rem">
+          🛏️ Sleeping Position
+        </h2>
+        <div class="flex flex-direction-column gap-5">
           <div>
-            <div class="launch-card-title">Walking Protocol</div>
-            <div class="launch-card-meta">5–10 min conscious practice</div>
+            <div class="flow-label mb-3" style="font-size: 0.7rem">Recommended</div>
+            <div class="flex flex-direction-column gap-2">
+              ${sleepingPosition.best.map(pos => `
+                <div class="flex items-center gap-3" style="font-size: 0.85rem;">
+                  <span style="color: var(--color-success)">✓</span> ${pos}
+                </div>
+              `).join('')}
+            </div>
           </div>
-        </div>
-        <div class="launch-card-status">
-          ${isCompletedToday('walking') ? '<span class="badge badge-success">✓ Done</span>' : '<span class="badge">Open</span>'}
-        </div>
-      </div>
-
-      <!-- Standing Checkpoint -->
-      <div class="glass-card launch-card standing animate-in" data-guide="standing" style="cursor:pointer">
-        <div class="launch-card-header">
-          <div class="launch-card-icon">🪞</div>
           <div>
-            <div class="launch-card-title">Standing Checkpoint</div>
-            <div class="launch-card-meta">2 min mirror check</div>
-          </div>
-        </div>
-        <div class="launch-card-status">
-          ${isCompletedToday('standing') ? '<span class="badge badge-success">✓ Done</span>' : '<span class="badge">Open</span>'}
-        </div>
-      </div>
-    </div>
-
-    <!-- Sitting Rules -->
-    <div class="glass-card no-hover mb-6 animate-in">
-      <h2 class="section-title mb-4" style="font-size: var(--fs-lg)">🪑 Sitting Rules</h2>
-      <p class="text-muted mb-4" style="font-size: var(--fs-sm); font-weight: var(--fw-semibold)">Non-negotiable:</p>
-      <div class="checklist mb-4">
-        ${sittingRules.rules.map(rule => `
-          <div class="checklist-item">
-            <div class="check-icon">✓</div>
-            <span>${rule}</span>
-          </div>
-        `).join('')}
-      </div>
-      <div class="warning-panel">
-        <div class="warning-panel-title">⚠️ Reset Rule</div>
-        <p style="font-size: var(--fs-sm); color: var(--text-secondary)">${sittingRules.reset}</p>
-      </div>
-    </div>
-
-    <!-- Sleeping Position -->
-    <div class="glass-card no-hover mb-6 animate-in">
-      <h2 class="section-title mb-4" style="font-size: var(--fs-lg)">🛏️ Sleeping Position</h2>
-      <div class="grid-2 mb-4">
-        <div>
-          <p class="text-muted mb-2" style="font-size: var(--fs-sm); font-weight: var(--fw-semibold)">✅ Best:</p>
-          <div class="checklist">
-            ${sleepingPosition.best.map(pos => `
-              <div class="checklist-item">
-                <div class="check-icon" style="border-color: var(--color-success);">✓</div>
-                <span>${pos}</span>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-        <div>
-          <p class="text-muted mb-2" style="font-size: var(--fs-sm); font-weight: var(--fw-semibold)">❌ Avoid:</p>
-          <div class="checklist">
-            ${sleepingPosition.avoid.map(pos => `
-              <div class="avoid-item">${pos}</div>
-            `).join('')}
+            <div class="flow-label mb-3" style="font-size: 0.7rem; color: var(--color-warning)">Avoid</div>
+            <div class="flex flex-direction-column gap-2">
+              ${sleepingPosition.avoid.map(pos => `
+                <div class="flex items-center gap-3" style="font-size: 0.85rem; opacity: 0.6;">
+                  <span style="color: var(--color-warning)">×</span> ${pos}
+                </div>
+              `).join('')}
+            </div>
           </div>
         </div>
       </div>
-      <p class="text-accent" style="font-size: var(--fs-sm)">${sleepingPosition.note}</p>
     </div>
   `;
 
@@ -106,54 +104,52 @@ function renderGuidesOverview(container) {
   });
 }
 
-function renderWalkingGuide(container) {
-  const done = isCompletedToday('walking');
-  const settings = getSettings();
+async function renderWalkingGuide(container) {
+  const done = await isCompletedToday('walking');
+  const settings = await getSettings();
   const walkTime = settings.walkingDuration || 5;
 
   container.innerHTML = `
-    <div class="page-hero animate-in">
-      <h1 class="page-title"><span class="gradient-text">Walking Protocol</span> 🚶</h1>
-      <p class="page-description">Conscious walking practice. Focus on form, not speed.</p>
+    <div class="mb-10 animate-in">
+      <h1 class="display-heading" style="font-size: 2.5rem">Walking Protocol</h1>
+      <p class="text-muted">Conscious movement practice.</p>
     </div>
 
-    <div class="guide-split animate-in">
-      <!-- Left: Focus Cues -->
-      <div class="glass-card no-hover">
-        <h3 class="section-title mb-3" style="font-size: var(--fs-md)">Focus Cues</h3>
-        <p class="text-muted mb-3" style="font-size: var(--fs-xs)">Check each cue as you walk.</p>
-        <div class="checklist" id="walking-checklist">
+    <div class="flex flex-direction-column gap-8 animate-in">
+      <!-- Immersive Timer -->
+      <div class="p-10 text-center" style="background: var(--bg-card); border-radius: 32px; border: 1px solid var(--border-glass); box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+          <div class="flow-label mb-3">Active Practice</div>
+          <div id="walk-timer" style="font-size: 5rem; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; margin: 1rem 0;">${walkTime}:00</div>
+          <div id="walk-cue" class="mt-4" style="font-size: 1.1rem; color: var(--text-accent); min-height: 1.5em; font-weight: 700; opacity: 0.9;"></div>
+          
+          <div class="flex justify-center gap-4 mt-10">
+            <button class="btn-start-glass" id="btn-walk-start" style="padding: 1.2rem 3rem;">▶ Start Walking</button>
+            <button class="btn btn-secondary hidden" id="btn-walk-stop" style="border-radius: 12px;">Stop</button>
+          </div>
+      </div>
+
+      <!-- Checklist -->
+      <div class="mt-4">
+        <h3 class="flow-label mb-6">Focus Cues</h3>
+        <div class="flex flex-direction-column gap-3">
           ${walkingProtocol.focusCues.map((cue, i) => `
-            <div class="checklist-item">
-              <div class="check-icon" id="walk-check-${i}" data-checked="false" onclick="this.dataset.checked = this.dataset.checked === 'true' ? 'false' : 'true'; this.classList.toggle('checked');">✓</div>
-              <span>${cue}</span>
+            <div class="flex items-center gap-4 p-5" style="background: rgba(255,255,255,0.02); border-radius: 20px; border: 1px solid var(--border-glass); cursor: pointer;" 
+                 onclick="this.style.opacity = this.style.opacity === '1' ? '0.4' : '1'; this.querySelector('.check-mark').style.display = this.querySelector('.check-mark').style.display === 'none' ? 'block' : 'none';">
+              <div style="width: 24px; height: 24px; border: 2px solid var(--accent-primary); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                <span class="check-mark" style="display: none; color: var(--accent-primary); font-weight: 900; font-size: 0.9rem;">✓</span>
+              </div>
+              <span style="font-weight: 600; font-size: 0.95rem; color: rgba(255,255,255,0.9);">${cue}</span>
             </div>
           `).join('')}
         </div>
       </div>
 
-      <!-- Right: Timer + Tip -->
-      <div class="guide-right-stack">
-        <div class="glass-card no-hover text-center" style="flex: 1; display: flex; flex-direction: column; justify-content: center;">
-          <h3 class="section-title mb-3" style="font-size: var(--fs-md)">Walking Timer</h3>
-          <div class="timer-display mb-4">
-            <div class="timer-value" id="walk-timer">${walkTime}:00</div>
-            <div class="timer-label">minutes</div>
-          </div>
-          <div id="walk-cue" class="text-accent mb-4" style="font-size: var(--fs-md); min-height: 1.5em; font-weight: var(--fw-semibold)"></div>
-          <div class="flex items-center gap-4" style="justify-content: center">
-            <button class="btn btn-primary btn-lg" id="btn-walk-start">▶ Start Walking</button>
-            <button class="btn btn-secondary btn-lg hidden" id="btn-walk-stop">⏹ Stop</button>
-          </div>
-        </div>
-        <div class="glass-card no-hover">
-          <div class="warning-panel">
-            <div class="warning-panel-title">📹 Film Yourself</div>
-            <p style="font-size: var(--fs-sm); color: var(--text-secondary)">Film yourself walking now. Film again in 3–4 weeks. Visual feedback > guessing.</p>
-          </div>
-        </div>
-        ${done ? '<div class="text-center"><span class="badge badge-success" style="font-size: var(--fs-sm); padding: var(--sp-2) var(--sp-5)">✓ Completed Today</span></div>' : ''}
+      <div class="p-6" style="border-radius: 20px; background: var(--bg-sidebar); border: 1px solid var(--border-glass);">
+        <div class="flow-label mb-2">Pro Tip</div>
+        <p style="font-size: 0.85rem; color: var(--text-secondary)">Film yourself walking now. Visual feedback beats guessing every time.</p>
       </div>
+
+      ${done ? '<div class="text-center"><span class="badge badge-success">✓ Completed Today</span></div>' : ''}
     </div>
   `;
 
@@ -174,19 +170,16 @@ function renderWalkingGuide(container) {
     startBtn.classList.add('hidden');
     stopBtn.classList.remove('hidden');
 
-    // Show random cue
     showRandomCue(cueEl);
     cueInterval = setInterval(() => showRandomCue(cueEl), 60000);
 
-    walkInterval = setInterval(() => {
+    walkInterval = setInterval(async () => {
       walkSeconds--;
       const m = Math.floor(walkSeconds / 60);
       const s = walkSeconds % 60;
       timerEl.textContent = `${m}:${s.toString().padStart(2, '0')}`;
 
-      if (walkSeconds <= 3 && walkSeconds > 0) {
-        audio.playCountdownBeep();
-      }
+      if (walkSeconds <= 3 && walkSeconds > 0) audio.playCountdownBeep();
 
       if (walkSeconds <= 0) {
         clearInterval(walkInterval);
@@ -197,8 +190,7 @@ function renderWalkingGuide(container) {
         startBtn.classList.remove('hidden');
         startBtn.textContent = '🔄 Restart';
         stopBtn.classList.add('hidden');
-        markCompleted('walking');
-        logDailyActivity();
+        await markCompleted('walking', { durationMin: walkTime, type: 'walking' });
       }
     }, 1000);
   });
@@ -218,43 +210,37 @@ function showRandomCue(el) {
   el.textContent = '→ ' + cues[Math.floor(Math.random() * cues.length)];
 }
 
-function renderStandingGuide(container) {
-  const done = isCompletedToday('standing');
+async function renderStandingGuide(container) {
+  const done = await isCompletedToday('standing');
 
   container.innerHTML = `
-    <div class="page-hero animate-in">
-      <h1 class="page-title"><span class="gradient-text">Standing Checkpoint</span> 🪞</h1>
-      <p class="page-description">Stand in front of a mirror. Hold for 2 minutes. It will feel awkward. That's normal.</p>
+    <div class="mb-10 animate-in">
+      <h1 class="display-heading" style="font-size: 2.5rem">Standing Checkpoint</h1>
+      <p class="text-muted">2-minute structural alignment.</p>
     </div>
 
-    <div class="guide-split animate-in">
-      <!-- Left: Checklist -->
-      <div class="glass-card no-hover">
-        <h3 class="section-title mb-3" style="font-size: var(--fs-md)">Posture Checklist</h3>
-        <div class="checklist" id="standing-checklist">
+    <div class="flex flex-direction-column gap-10 animate-in">
+      <div class="p-8 text-center" style="background: var(--bg-card); border-radius: 32px; border: 1px solid var(--border-glass);">
+          <div id="stand-timer" style="font-size: 6rem; font-weight: 800; font-variant-numeric: tabular-nums;">2:00</div>
+          <div class="flex justify-center gap-4 mt-8">
+            <button class="btn-start-glass" id="btn-stand-start" style="padding: 1rem 2.5rem;">▶ Start 2-Min Hold</button>
+            <button class="btn btn-secondary hidden" id="btn-stand-stop" style="border-radius: 12px;">Stop</button>
+          </div>
+      </div>
+
+      <div>
+        <h3 class="flow-label mb-6">Alignment Matrix</h3>
+        <div class="flex flex-direction-column gap-3">
           ${standingCheckpoint.checkpoints.map((cp, i) => `
-            <div class="checklist-item">
-              <div class="check-icon" id="stand-check-${i}" data-checked="false" onclick="this.dataset.checked = this.dataset.checked === 'true' ? 'false' : 'true'; this.classList.toggle('checked');">✓</div>
-              <span>${cp}</span>
+             <div class="flex items-center gap-4 p-4" style="background: rgba(255,255,255,0.03); border-radius: 16px;">
+              <div style="color: var(--accent-primary); font-weight: 800;">✓</div>
+              <span style="font-weight: 600; font-size: 0.9rem;">${cp}</span>
             </div>
           `).join('')}
         </div>
       </div>
 
-      <!-- Right: Timer -->
-      <div class="guide-right-stack">
-        <div class="glass-card no-hover text-center" style="flex: 1; display: flex; flex-direction: column; justify-content: center;">
-          <div class="timer-display mb-4">
-            <div class="timer-value" id="stand-timer">2:00</div>
-            <div class="timer-label">minutes</div>
-          </div>
-          <div class="flex items-center gap-4" style="justify-content: center">
-            <button class="btn btn-primary btn-lg" id="btn-stand-start">▶ Start 2-Min Hold</button>
-            <button class="btn btn-secondary btn-lg hidden" id="btn-stand-stop">⏹ Stop</button>
-          </div>
-        </div>
-        ${done ? '<div class="text-center"><span class="badge badge-success" style="font-size: var(--fs-sm); padding: var(--sp-2) var(--sp-5)">✓ Completed Today</span></div>' : ''}
-      </div>
+      ${done ? '<div class="text-center"><span class="badge badge-success">✓ Completed Today</span></div>' : ''}
     </div>
   `;
 
@@ -272,7 +258,7 @@ function renderStandingGuide(container) {
     startBtn.classList.add('hidden');
     stopBtn.classList.remove('hidden');
 
-    standInterval = setInterval(() => {
+    standInterval = setInterval(async () => {
       standSeconds--;
       const m = Math.floor(standSeconds / 60);
       const s = standSeconds % 60;
@@ -288,8 +274,7 @@ function renderStandingGuide(container) {
         startBtn.classList.remove('hidden');
         startBtn.textContent = '🔄 Restart';
         stopBtn.classList.add('hidden');
-        markCompleted('standing');
-        logDailyActivity();
+        await markCompleted('standing', { durationMin: 2, type: 'standing' });
       }
     }, 1000);
   });
