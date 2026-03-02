@@ -4,7 +4,7 @@
    ======================================== */
 
 import { db, getCurrentUser } from './firebase.js';
-import { doc, getDoc, setDoc, collection, getDocs, deleteDoc, query, orderBy, limit } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
 
 // ─── In-Memory Cache ───
 const cache = {};
@@ -19,8 +19,20 @@ function getCacheKey(key) {
 }
 
 // ─── Helpers ───
+function formatLocalDateKey(date) {
+    const d = String(date.getDate()).padStart(2, '0');
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const y = date.getFullYear();
+    return `${y}-${m}-${d}`;
+}
+
+function parseDateKey(dateKey) {
+    const [y, m, d] = dateKey.split('-').map(Number);
+    return new Date(y, (m || 1) - 1, d || 1);
+}
+
 function getToday() {
-    return new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    return formatLocalDateKey(new Date()); // YYYY-MM-DD (local timezone)
 }
 
 function getUserDocRef(docName) {
@@ -41,8 +53,35 @@ const defaultSettings = {
     plankDuration: 30,
     walkingDuration: 5,
     soundEnabled: true,
-    darkMode: true
+    darkMode: true,
+    units: 'metric',
+    intensity: 'moderate',
+    voiceGuidance: false,
+    reminderEnabled: false,
+    reminderHour: 20
 };
+
+const TODAY_PLAN_TASKS = [
+    { id: 'foot-arch', label: 'Foot + Arch Foundation', path: '/player/foot-arch', kind: 'routine' },
+    { id: 'hip-glute', label: 'Hip + Glute Control', path: '/player/hip-glute', kind: 'routine' },
+    { id: 'upper-body', label: 'Upper Body Alignment', path: '/player/upper-body', kind: 'routine' },
+    { id: 'walking', label: 'Walking Protocol', path: '/guides/walking', kind: 'guide' },
+    { id: 'standing', label: 'Standing Checkpoint', path: '/guides/standing', kind: 'guide' },
+    { id: 'night-mobility', label: 'Night Mobility', path: '/player/night-mobility', kind: 'routine' },
+    { id: 'strength-session', label: 'Strength Session', path: '/strength', kind: 'strength' }
+];
+
+function resolvePlanTaskMeta(taskId, routines = {}) {
+    const direct = routines[taskId];
+    if (direct) return direct;
+
+    // Completing "daily-reset" covers the first 3 routine blocks.
+    if ((taskId === 'foot-arch' || taskId === 'hip-glute' || taskId === 'upper-body') && routines['daily-reset']) {
+        return { ...routines['daily-reset'], sourceRoutine: 'daily-reset' };
+    }
+
+    return null;
+}
 
 export async function getSettings() {
     const cacheKey = getCacheKey('settings');
@@ -76,15 +115,33 @@ export async function getUserProfile() {
 
     try {
         const snap = await getDoc(getUserDocRef('profile'));
-        const data = snap.exists() ? snap.data() : {
+        const base = {
             joinedAt: new Date().toISOString(),
-            totalSessions: 0
+            totalSessions: 0,
+            age: null,
+            gender: '',
+            heightCm: null,
+            weightKg: null,
+            experienceLevel: 'beginner',
+            goalFocus: 'posture',
+            onboardingCompleted: false
         };
+        const data = snap.exists() ? { ...base, ...snap.data() } : base;
         cache[cacheKey] = data;
         return data;
     } catch (error) {
         console.error('Error loading profile:', error);
-        return { joinedAt: new Date().toISOString(), totalSessions: 0 };
+        return {
+            joinedAt: new Date().toISOString(),
+            totalSessions: 0,
+            age: null,
+            gender: '',
+            heightCm: null,
+            weightKg: null,
+            experienceLevel: 'beginner',
+            goalFocus: 'posture',
+            onboardingCompleted: false
+        };
     }
 }
 
@@ -148,6 +205,50 @@ export async function getCompletedToday() {
     const activity = await getTodayActivity();
     const items = Object.keys(activity.routines || {});
     return { date: getToday(), items };
+}
+
+export async function getTodayPlan() {
+    const activity = await getTodayActivity();
+    const routines = activity.routines || {};
+
+    const tasks = TODAY_PLAN_TASKS.map((task) => {
+        const meta = resolvePlanTaskMeta(task.id, routines);
+        return {
+            ...task,
+            done: Boolean(meta),
+            completedAt: meta?.completedAt || null,
+            exerciseCount: Number(meta?.exerciseCount || 0),
+            sourceRoutine: meta?.sourceRoutine || null
+        };
+    });
+
+    const doneCount = tasks.filter((task) => task.done).length;
+    const total = tasks.length;
+    const percent = total > 0 ? Math.round((doneCount / total) * 100) : 0;
+    const remaining = tasks.filter((task) => !task.done);
+    const timeline = tasks
+        .filter((task) => task.done && task.completedAt)
+        .sort((a, b) => new Date(a.completedAt).getTime() - new Date(b.completedAt).getTime())
+        .map((task) => ({
+            id: task.id,
+            label: task.label,
+            path: task.path,
+            completedAt: task.completedAt,
+            time: new Date(task.completedAt).toLocaleTimeString('en-US', {
+                hour: 'numeric',
+                minute: '2-digit'
+            })
+        }));
+
+    return {
+        date: getToday(),
+        tasks,
+        doneCount,
+        total,
+        percent,
+        remaining,
+        timeline
+    };
 }
 
 export async function markCompleted(routineId, metadata = {}) {
@@ -214,7 +315,7 @@ async function updateStreak() {
 
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().split('T')[0];
+    const yesterdayStr = formatLocalDateKey(yesterday);
 
     if (streak.lastActiveDate === yesterdayStr) {
         streak.currentStreak += 1;
@@ -256,6 +357,57 @@ export async function getDailyLog() {
     }
 }
 
+export async function getActivityByDate(dateKey) {
+    const cacheKey = getCacheKey(`activity_${dateKey}`);
+    if (cache[cacheKey]) return cache[cacheKey];
+
+    try {
+        const user = getCurrentUser();
+        if (!user) throw new Error('Not authenticated');
+        const docRef = doc(db, 'users', user.uid, 'activityLog', dateKey);
+        const snap = await getDoc(docRef);
+        const data = snap.exists() ? snap.data() : {
+            routines: {},
+            totalRoutines: 0,
+            totalExercises: 0
+        };
+        cache[cacheKey] = data;
+        return data;
+    } catch (error) {
+        console.error('Error loading activity by date:', error);
+        return { routines: {}, totalRoutines: 0, totalExercises: 0 };
+    }
+}
+
+export async function getActivityDetailsForDate(dateKey) {
+    const [activity, strengthLog] = await Promise.all([
+        getActivityByDate(dateKey),
+        getStrengthLog()
+    ]);
+
+    const strengthEntry = strengthLog.find(e => e.date === dateKey) || null;
+    const strengthExercises = strengthEntry?.exercises || {};
+    const totalStrengthVolume = Object.values(strengthExercises).reduce((sum, setData) => {
+        const reps = Number(setData?.reps || 0);
+        const weight = Number(setData?.weight || 0);
+        return sum + (reps * weight);
+    }, 0);
+
+    const routineItems = Object.entries(activity.routines || {}).map(([id, meta]) => ({
+        id,
+        ...meta
+    }));
+
+    return {
+        date: dateKey,
+        routineItems,
+        totalRoutines: activity.totalRoutines || routineItems.length,
+        totalExercises: activity.totalExercises || 0,
+        strengthEntry,
+        totalStrengthVolume
+    };
+}
+
 // ─── Strength Log ───
 export async function getStrengthLog() {
     const cacheKey = getCacheKey('strengthLog');
@@ -288,6 +440,12 @@ export async function saveStrengthEntry(entry) {
         const docRef = doc(db, 'users', user.uid, 'strengthLog', today);
         await setDoc(docRef, { exercises: entry });
 
+        // Count a strength day in unified daily activity metrics.
+        await markCompleted('strength-session', {
+            type: 'strength',
+            exerciseCount: Object.keys(entry || {}).length
+        });
+
         // Invalidate cache so next read gets fresh data
         const cacheKey = getCacheKey('strengthLog');
         delete cache[cacheKey];
@@ -299,11 +457,13 @@ export async function saveStrengthEntry(entry) {
 export async function getStrengthSessionsThisWeek() {
     const log = await getStrengthLog();
     const now = new Date();
-    const dayOfWeek = now.getDay();
+    const dayOfWeek = now.getDay(); // 0=Sun ... 6=Sat
     const weekStart = new Date(now);
-    weekStart.setDate(now.getDate() - dayOfWeek);
-    const weekStartStr = weekStart.toISOString().split('T')[0];
-    return log.filter(e => e.date >= weekStartStr);
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    weekStart.setDate(now.getDate() + mondayOffset);
+    weekStart.setHours(0, 0, 0, 0);
+    const weekStartStr = formatLocalDateKey(weekStart);
+    return log.filter(e => e.date >= weekStartStr && e.date <= getToday());
 }
 
 // ─── Migration: localStorage → Firestore ───
@@ -399,6 +559,16 @@ export async function migrateLocalStorageToFirestore() {
 // ─── Auth State Reset ───
 export function onUserChanged() {
     clearCache();
+}
+
+export function isProfileComplete(profile) {
+    if (!profile) return false;
+    return Boolean(
+        Number(profile.age) > 0 &&
+        Number(profile.heightCm) > 0 &&
+        Number(profile.weightKg) > 0 &&
+        String(profile.gender || '').trim()
+    );
 }
 
 export { getToday };

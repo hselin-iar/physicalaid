@@ -3,7 +3,7 @@
    ======================================== */
 
 import { ExType, allRoutines, nightMobility, dailyResetFull, footArch, hipGlute, upperBody } from '../data.js';
-import { startRoutine, stopRoutine, pauseResume, skipExercise, restartExercise, countRep, getState, previousExercise } from '../timer.js';
+import { startRoutine, stopRoutine, pauseResume, skipExercise, skipRest, countRep, getState, previousExercise } from '../timer.js';
 import { navigate } from '../router.js';
 
 // Map routine IDs to data
@@ -13,6 +13,8 @@ const routineMap = {
   'upper-body': upperBody,
   'night-mobility': nightMobility
 };
+
+let removeKeyboardControls = null;
 
 export function renderPlayer(routineId) {
   const overlay = document.getElementById('player-overlay');
@@ -37,17 +39,70 @@ export function renderPlayer(routineId) {
   overlay.innerHTML = buildPlayerUI(title);
   overlay.classList.remove('hidden');
   document.body.style.overflow = 'hidden';
+  setupKeyboardControls();
 
   // Bind close button
   overlay.querySelector('#player-close')?.addEventListener('click', () => {
-    stopRoutine();
-    overlay.classList.add('hidden');
-    document.body.style.overflow = '';
-    navigate('/');
+    closePlayer();
   });
 
   // Start the routine
   startRoutine(routineId, exercises, updateUI, onRoutineComplete);
+}
+
+function closePlayer() {
+  const overlay = document.getElementById('player-overlay');
+  stopRoutine();
+  teardownKeyboardControls();
+  overlay?.classList.add('hidden');
+  document.body.style.overflow = '';
+  navigate('/');
+}
+
+function setupKeyboardControls() {
+  teardownKeyboardControls();
+  const onKeyDown = (e) => {
+    const overlay = document.getElementById('player-overlay');
+    if (!overlay || overlay.classList.contains('hidden')) return;
+
+    if (e.key === ' ') {
+      e.preventDefault();
+      const s = getState();
+      if (!s.currentExercise) return;
+      if (!s.isResting && s.currentExercise.type !== ExType.TIMED) {
+        countRep();
+      } else {
+        pauseResume();
+      }
+      return;
+    }
+
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      previousExercise();
+      return;
+    }
+
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      const s = getState();
+      if (s.isResting) {
+        skipRest();
+      } else {
+        skipExercise();
+      }
+    }
+  };
+
+  document.addEventListener('keydown', onKeyDown);
+  removeKeyboardControls = () => document.removeEventListener('keydown', onKeyDown);
+}
+
+function teardownKeyboardControls() {
+  if (removeKeyboardControls) {
+    removeKeyboardControls();
+    removeKeyboardControls = null;
+  }
 }
 
 function buildPlayerUI(title) {
@@ -93,10 +148,7 @@ function updateUI(s) {
       `;
 
       body.querySelector('#btn-finish')?.addEventListener('click', () => {
-        stopRoutine();
-        overlay.classList.add('hidden');
-        document.body.style.overflow = '';
-        navigate('/');
+        closePlayer();
       });
     }
     return;
@@ -106,15 +158,15 @@ function updateUI(s) {
   if (!ex) return;
 
   const mode = s.isResting ? 'rest' : 'active';
-  const exId = ex.id;
+  const exKey = `${ex.id}:${ex.sideName || 'none'}`;
 
   // Check if we need to full re-render
-  // Re-render if: mode changed, or exercise changed
-  const needsRender = body.dataset.mode !== mode || body.dataset.exerciseId !== exId;
+  // Re-render if mode, exercise id, or side variant changed.
+  const needsRender = body.dataset.mode !== mode || body.dataset.exerciseKey !== exKey;
 
   if (needsRender) {
     body.dataset.mode = mode;
-    body.dataset.exerciseId = exId;
+    body.dataset.exerciseKey = exKey;
 
     if (s.isResting) {
       renderRestUI(body, s, ex);
@@ -162,6 +214,7 @@ function renderRestUI(body, s, ex) {
               <div class="timer-value" id="timer-value">${s.timeRemaining}</div>
               <div class="timer-label">seconds</div>
             </div>
+            <div class="pause-overlay" id="pause-overlay" style="display: none;">⏸</div>
           </div>
 
           <button class="player-nav-btn next" id="btn-next" title="Skip Rest">
@@ -180,34 +233,48 @@ function renderActiveUI(body, s, ex) {
   body.className = 'player-body player-body--split';
   const sideInfo = ex.sideName ? `(${ex.sideName})` : '';
 
-
-  /* Visual (Image or Emoji) */
-  let visualHTML = '';
+  /* 
+     1. Visual Card (Image + Title inside) 
+  */
+  let visualContent = '';
   if (ex.image) {
-    visualHTML = `<div class="player-image-container"><img src="${ex.image}" alt="${ex.name}" class="player-exercise-image animate-in"></div>`;
+    visualContent = `<img src="${ex.image}" alt="${ex.name}" class="player-exercise-image animate-in">`;
   } else {
-    visualHTML = `<div class="player-emoji-inline">${ex.emoji}</div>`;
+    visualContent = `<div class="player-emoji-inline">${ex.emoji}</div>`;
   }
 
-  /* Steps */
+  const visualCardHTML = `
+    <div class="player-visual-card">
+      <div class="player-image-wrapper">
+        ${visualContent}
+      </div>
+      <div class="player-visual-footer">
+        <h2 class="visual-title">${ex.name} ${sideInfo}</h2>
+        <div class="visual-subtitle">${ex.purpose}</div>
+      </div>
+    </div>
+  `;
+
+  /* 
+     2. Steps Card 
+  */
   const hasSteps = ex.steps && ex.steps.length > 0;
-  const stepsList = hasSteps ? `
-      <div class="player-steps">
-        <div class="player-steps-title">How to do it</div>
-        <ol class="player-steps-list">
-          ${ex.steps.map(st => `<li>${st}</li>`).join('')}
+  const stepsCardHTML = hasSteps ? `
+      <div class="player-steps-card">
+        <div class="steps-header">HOW TO DO IT</div>
+        <ol class="steps-list">
+          ${ex.steps.map(st => `<li><span>${st}</span></li>`).join('')}
         </ol>
       </div>
   ` : '';
 
-  /* Right Panel Meta */
-  const metaHTML = `
-    <h2 class="player-exercise-name">${ex.name} ${sideInfo}</h2>
-    <div class="player-exercise-purpose">${ex.purpose}</div>
-    <div class="player-set-indicator" id="set-indicator">
-      Set ${s.currentSet} of ${s.totalSets} · Exercise ${s.currentIndex + 1}/${s.totalExercises}
+  /* 
+     3. Footer (Set Info + Controls) 
+  */
+  const setInfoHTML = `
+    <div class="player-set-pill">
+      SET ${s.currentSet} OF ${s.totalSets} · EXERCISE ${s.currentIndex + 1}/${s.totalExercises}
     </div>
-
   `;
 
   let actionHTML = '';
@@ -215,85 +282,82 @@ function renderActiveUI(body, s, ex) {
     const circumference = 2 * Math.PI * 120;
     const progress = s.totalDuration > 0 ? (s.timeRemaining / s.totalDuration) : 1;
     const dashoffset = circumference * (1 - progress);
+
+    // Timer Ring
     actionHTML = `
-      <svg class="timer-svg-ring" width="280" height="280" viewBox="0 0 260 260">
-        <circle cx="130" cy="130" r="120" fill="none" stroke="rgba(99, 102, 241, 0.1)" stroke-width="6" />
-        <circle class="timer-svg-progress" cx="130" cy="130" r="120" fill="none" stroke="url(#timer-gradient)" stroke-width="6" stroke-linecap="round"
-          stroke-dasharray="${circumference}" stroke-dashoffset="${dashoffset}"
-          transform="rotate(-90 130 130)" />
-        <defs>
-          <linearGradient id="timer-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#7c3aed" />
-            <stop offset="100%" stop-color="#4f46e5" />
-          </linearGradient>
-        </defs>
-      </svg>
-      <div class="timer-ring-content">
-        <div class="timer-value" id="timer-value">${s.timeRemaining}</div>
-        <div class="timer-label">seconds</div>
+      <div class="timer-ring-container">
+        <svg class="timer-svg" width="240" height="240" viewBox="0 0 260 260">
+           <!-- BG Circle -->
+           <circle cx="130" cy="130" r="120" fill="none" stroke="rgba(255, 255, 255, 0.1)" stroke-width="4" />
+           <!-- Progress (Purple) -->
+           <circle class="timer-svg-progress" cx="130" cy="130" r="120" fill="none" stroke="#8b5cf6" stroke-width="4" stroke-linecap="round"
+             stroke-dasharray="${circumference}" stroke-dashoffset="${dashoffset}"
+             transform="rotate(-90 130 130)" />
+        </svg>
+        <div class="timer-content">
+          <div class="timer-number" id="timer-value">${s.timeRemaining}</div>
+          <div class="timer-label">SECONDS</div>
+        </div>
       </div>
     `;
   } else {
     const circumference = 2 * Math.PI * 120;
     const progress = s.targetReps > 0 ? (s.repCount / s.targetReps) : 0;
     const dashoffset = circumference * (1 - progress);
+
     actionHTML = `
-      <svg class="timer-svg-ring" width="280" height="280" viewBox="0 0 260 260">
-        <circle cx="130" cy="130" r="120" fill="none" stroke="rgba(99, 102, 241, 0.1)" stroke-width="6" />
-        <circle class="timer-svg-progress" cx="130" cy="130" r="120" fill="none" stroke="url(#rep-gradient)" stroke-width="6" stroke-linecap="round"
-          stroke-dasharray="${circumference}" stroke-dashoffset="${dashoffset}"
-          transform="rotate(-90 130 130)" />
-        <defs>
-          <linearGradient id="rep-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#7c3aed" />
-            <stop offset="100%" stop-color="#4f46e5" />
-          </linearGradient>
-        </defs>
-      </svg>
-      <div class="timer-ring-content">
-        <div class="rep-value" id="rep-value">${s.repCount}</div>
-        <div class="rep-target">of ${s.targetReps} reps</div>
-        <button class="rep-btn" id="rep-tap">+1</button>
+      <div class="timer-ring-container">
+        <svg class="timer-svg" width="240" height="240" viewBox="0 0 260 260">
+           <circle cx="130" cy="130" r="120" fill="none" stroke="rgba(255, 255, 255, 0.1)" stroke-width="4" />
+           <circle class="timer-svg-progress" cx="130" cy="130" r="120" fill="none" stroke="#8b5cf6" stroke-width="4" stroke-linecap="round"
+             stroke-dasharray="${circumference}" stroke-dashoffset="${dashoffset}"
+             transform="rotate(-90 130 130)" />
+        </svg>
+        <div class="timer-content">
+          <div class="timer-number" id="rep-value">${s.repCount}</div>
+          <div class="timer-label">of ${s.targetReps} reps</div>
+          <button class="rep-tap-area" id="rep-tap"></button>
+        </div>
       </div>
     `;
   }
 
+  /* Assemble DOM */
   body.innerHTML = `
-    <div class="player-panel-left">
-      ${visualHTML}
-      ${stepsList}
+    <div class="player-scroll-area">
+      ${visualCardHTML}
+      ${stepsCardHTML}
     </div>
     
-     <div class="player-panel-right">
-       <div class="player-content-wrapper">
-         ${metaHTML}
-         
-         <div class="player-action-row">
-           <button class="player-nav-btn prev" id="btn-prev" title="Previous Exercise">
-             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
-           </button>
-           
-           <div class="timer-wrapper" id="timer-wrapper" title="Click to Pause/Resume">
-             <div class="timer-ring">
-               ${actionHTML}
-             </div>
-             <div class="timer-pause-overlay" id="pause-overlay" style="display: none;"><div class="pause-icon">⏸</div></div>
-           </div>
+    <div class="player-fixed-footer">
+       ${setInfoHTML}
+       
+       <div class="player-controls-row">
+          <button class="control-btn prev" id="btn-prev" title="Previous">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          
+          <div class="timer-interactive" id="timer-wrapper">
+             ${actionHTML}
+             <div class="pause-overlay" id="pause-overlay" style="display: none;">⏸</div>
+          </div>
 
-           <button class="player-nav-btn next" id="btn-next" title="Next Exercise">
-             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-           </button>
-         </div>
-
-         <div class="player-hint text-muted mt-4" style="font-size: var(--fs-xs); opacity: 0.6;">
-           ${ex.type === ExType.TIMED ? 'Tap timer to pause' : ''}
-         </div>
+          <button class="control-btn next" id="btn-next" title="Next">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
        </div>
-     </div>
-   `;
+       
+       <div class="footer-hint">
+         ${ex.type === ExType.TIMED ? 'Tap timer or press Space to pause' : 'Tap timer or press Space to count reps'}
+       </div>
+    </div>
+  `;
 
   if (ex.type !== ExType.TIMED) {
-    body.querySelector('#rep-tap')?.addEventListener('click', () => countRep());
+    body.querySelector('#rep-tap')?.addEventListener('click', (e) => {
+      e.stopPropagation(); // Prevent pause
+      countRep();
+    });
   }
 }
 
@@ -302,7 +366,7 @@ function updateValues(body, s, ex) {
   if (ex.type === ExType.TIMED || s.isResting) {
     const valEl = document.getElementById('timer-value');
     if (valEl) valEl.textContent = s.timeRemaining;
-    // Update SVG ring progress
+
     const progressCircle = body.querySelector('.timer-svg-progress');
     if (progressCircle && s.totalDuration > 0) {
       const circumference = 2 * Math.PI * 120;
@@ -312,7 +376,7 @@ function updateValues(body, s, ex) {
   } else {
     const repEl = document.getElementById('rep-value');
     if (repEl) repEl.textContent = s.repCount;
-    // Update SVG ring progress for reps
+
     const progressCircle = body.querySelector('.timer-svg-progress');
     if (progressCircle && s.targetReps > 0) {
       const circumference = 2 * Math.PI * 120;
@@ -327,10 +391,8 @@ function updateValues(body, s, ex) {
 
   if (timerWrapper) {
     if (s.paused) {
-      timerWrapper.classList.add('paused');
       if (pauseOverlay) pauseOverlay.style.display = 'flex';
     } else {
-      timerWrapper.classList.remove('paused');
       if (pauseOverlay) pauseOverlay.style.display = 'none';
     }
   }
@@ -340,13 +402,42 @@ function bindControls() {
   const timerWrap = document.getElementById('timer-wrapper');
   if (timerWrap) {
     timerWrap.onclick = (e) => {
-      if (e.target.closest('.rep-btn')) return;
-      pauseResume();
+      // Look up fresh state to avoid stale closure issues
+      const s = getState();
+      const ex = s.currentExercise;
+
+      // Don't handle if user is tapping for reps
+      if (e.target.closest('.rep-tap-area')) return;
+
+      // During rest, always pause/resume
+      if (s.isResting) {
+        pauseResume();
+        return;
+      }
+
+      // Active state logic
+      if (ex && ex.type !== ExType.TIMED) {
+        countRep();
+      } else {
+        pauseResume();
+      }
     };
   }
 
-  document.getElementById('btn-prev')?.addEventListener('click', previousExercise);
-  document.getElementById('btn-next')?.addEventListener('click', () => skipExercise());
+  document.getElementById('btn-prev')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    previousExercise();
+  });
+
+  document.getElementById('btn-next')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const s = getState();
+    if (s.isResting) {
+      skipRest();
+    } else {
+      skipExercise();
+    }
+  });
 }
 
 function onRoutineComplete(routineId) {

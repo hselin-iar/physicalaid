@@ -24,7 +24,7 @@ function renderGuidesOverview(container) {
     </div>
 
     <!-- Immersive Guide Launchers -->
-    <div class="flex gap-4 mb-12 animate-in">
+    <div class="flex gap-4 mb-12 animate-in guide-launchers-row">
       <div class="routine-card-new" data-guide="walking" style="cursor:pointer; flex: 1 1 0; min-width: 0; height: 200px; border-radius: 20px;">
           <div class="card-image"><img src="/images/exercises/glute_bridges.png" style="opacity: 0.2"></div>
           <div class="card-content" style="padding: var(--sp-6);">
@@ -36,7 +36,7 @@ function renderGuidesOverview(container) {
           </div>
       </div>
       <div class="routine-card-new" data-guide="standing" style="cursor:pointer; flex: 1 1 0; min-width: 0; height: 200px; border-radius: 20px;">
-          <div class="card-image"><img src="/images/exercises/plank.png" style="opacity: 0.2"></div>
+          <div class="card-image"><img src="/images/exercises/dead_bug.png" style="opacity: 0.2"></div>
           <div class="card-content" style="padding: var(--sp-6);">
             <div style="margin-bottom: var(--sp-2)">
               <div class="flow-label" style="color:#fff; font-size: 0.65rem; opacity: 0.7;">Alignment</div>
@@ -48,7 +48,7 @@ function renderGuidesOverview(container) {
     </div>
 
     <!-- Sitting Rules + Sleeping Position (Side-by-Side) -->
-    <div class="flex gap-8 mb-12 animate-in" style="align-items: flex-start;">
+    <div class="flex gap-8 mb-12 animate-in guide-overview-row" style="align-items: flex-start;">
       <div style="flex: 1 1 0; min-width: 0;">
         <h2 class="flow-label mb-6" style="font-size: 1.2rem; font-weight: 900; border-bottom: 1px solid var(--border-glass); padding-bottom: 0.5rem">
           🪑 Sitting Rules

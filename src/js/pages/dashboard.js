@@ -2,35 +2,32 @@
    PhysicalAid — Dashboard Page
    ======================================== */
 
-import { allRoutines, walkingProtocol, standingCheckpoint, nightMobility, quotes } from '../data.js';
-import { getCompletedToday, getStreakData, isCompletedToday, getDailyLog, getUserProfile } from '../storage.js';
+import { allRoutines, walkingProtocol, standingCheckpoint, nightMobility, gymPlan } from '../data.js';
+import { getStreakData, getDailyLog, getUserProfile, saveUserProfile, getStrengthLog, getToday, isProfileComplete, getTodayPlan } from '../storage.js';
 import { navigate } from '../router.js';
-import { renderHeatmapCard, renderMinimalHeatmap } from '../components/heatmap.js';
+import { renderMinimalHeatmap } from '../components/heatmap.js';
 import { getCurrentUser, signOutUser } from '../firebase.js';
 
+let dashboardOutsideClickHandler = null;
 
 export async function renderDashboard(container) {
-  const streak = await getStreakData();
-  const completed = await getCompletedToday();
-  const dailyLog = await getDailyLog();
-  const profile = await getUserProfile();
+  const [streak, dailyLog, profile, strengthLog, todayPlan] = await Promise.all([
+    getStreakData(),
+    getDailyLog(),
+    getUserProfile(),
+    getStrengthLog(),
+    getTodayPlan()
+  ]);
   const user = getCurrentUser();
-  const quote = quotes[Math.floor(Math.random() * quotes.length)];
+  const today = getToday();
+  const hasGymLogToday = strengthLog.some(e => e.date === today);
+  const gymDay = getTodayGymDay();
+  const needsProfileSetup = !isProfileComplete(profile);
 
-  // Count total routines available
-  const totalRoutines = 6; // foot, hip, upper, walking, standing, mobility
-  const completedCount = completed.items.length;
+  // Count total daily trackables: 6 routine items + strength session.
+  const totalRoutines = todayPlan.total || 7;
+  const completedCount = todayPlan.doneCount || 0;
   const completionPct = Math.round((completedCount / totalRoutines) * 100);
-
-  // Calculate weekly completion
-  const now = new Date();
-  const weekDays = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - i);
-    weekDays.push(d.toISOString().split('T')[0]);
-  }
-  const activeDays = weekDays.filter(d => dailyLog[d] && dailyLog[d] > 0).length;
 
   container.innerHTML = `
     <!-- Top Header (Breadcrumb + Profile) -->
@@ -119,7 +116,7 @@ export async function renderDashboard(container) {
             </defs>
           </svg>
           <div class="floating-gauge-label">
-            <div class="floating-gauge-val">${completedCount}/6</div>
+            <div class="floating-gauge-val">${completedCount}/${totalRoutines}</div>
             <div class="floating-gauge-text">tasks</div>
           </div>
         </div>
@@ -130,7 +127,6 @@ export async function renderDashboard(container) {
         ${renderMinimalHeatmap(dailyLog, 24)}
       </div>
     </div>
-
 
     <!-- Section: Daily Reset -->
     <div class="mb-8 animate-in">
@@ -155,6 +151,56 @@ export async function renderDashboard(container) {
         ${renderNewCard(nightMobility, '/images/exercises/night-mobility-realistic.png')}
       </div>
     </div>
+
+    <div class="mb-8 animate-in">
+      <h2 class="section-heading">Today in Gym Plan</h2>
+      <p class="section-sub">Your scheduled focus for today</p>
+      <div style="padding: var(--sp-5); border-radius: 22px; border: 1px solid var(--border-glass); background: var(--bg-card);">
+        <div class="flex items-center justify-between" style="gap: var(--sp-3);">
+          <div>
+            <div class="flow-label" style="margin: 0 0 0.35rem;">${gymDay.day}</div>
+            <div style="font-size: 1.1rem; font-weight: 800; color: #fff;">${gymDay.focus}</div>
+            <div class="text-muted" style="font-size: 0.75rem; margin-top: 0.25rem;">
+              ${gymDay.isRest ? gymDay.note || 'Mobility and active recovery' : `${gymDay.exercises.length} exercises planned`}
+            </div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-end;">
+            <span class="badge ${hasGymLogToday ? 'badge-success' : ''}">
+              ${hasGymLogToday ? 'Logged Today' : 'Not Logged'}
+            </span>
+            <button id="btn-open-strength" class="btn-start-glass" style="padding: 0.45rem 0.8rem;">
+              Open Strength
+            </button>
+          </div>
+        </div>
+        ${gymDay.isRest ? '' : `
+          <div style="display: grid; gap: 6px; margin-top: var(--sp-4);">
+            ${gymDay.exercises.slice(0, 3).map(ex => `<div class="text-muted" style="font-size: 0.74rem;">• ${ex.name}</div>`).join('')}
+          </div>
+        `}
+      </div>
+    </div>
+
+    ${needsProfileSetup ? `
+      <div class="mb-8 animate-in" id="profile-setup-card" style="padding: var(--sp-5); border-radius: 22px; border: 1px solid rgba(245, 158, 11, 0.45); background: rgba(245, 158, 11, 0.06);">
+        <h2 class="section-heading" style="margin-bottom: 0.35rem;">Finish Your Profile</h2>
+        <p class="text-muted" style="font-size: 0.78rem; margin-bottom: var(--sp-4);">Add these once so we can personalize routine and gym suggestions.</p>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;">
+          <input id="profile-age" class="log-input" type="number" min="10" max="90" placeholder="Age" value="${profile.age || ''}" style="width: 100%;" />
+          <select id="profile-gender" class="setting-select" style="width: 100%;">
+            <option value="">Gender</option>
+            <option value="male" ${profile.gender === 'male' ? 'selected' : ''}>Male</option>
+            <option value="female" ${profile.gender === 'female' ? 'selected' : ''}>Female</option>
+            <option value="other" ${profile.gender === 'other' ? 'selected' : ''}>Other</option>
+          </select>
+          <input id="profile-height" class="log-input" type="number" min="120" max="230" placeholder="Height (cm)" value="${profile.heightCm || ''}" style="width: 100%;" />
+          <input id="profile-weight" class="log-input" type="number" min="35" max="250" placeholder="Weight (kg)" value="${profile.weightKg || ''}" style="width: 100%;" />
+        </div>
+        <div class="mt-4">
+          <button id="btn-save-profile-setup" class="btn-start-glass" style="width: 100%;">Save Personalization Data</button>
+        </div>
+      </div>
+    ` : ''}
   `;
 
   // Shell Actions
@@ -172,11 +218,15 @@ export async function renderDashboard(container) {
   });
 
   // Close dropdown when clicking outside
-  document.addEventListener('click', (e) => {
+  if (dashboardOutsideClickHandler) {
+    document.removeEventListener('click', dashboardOutsideClickHandler);
+  }
+  dashboardOutsideClickHandler = (e) => {
     if (!dropdown?.contains(e.target) && !profileBtn?.contains(e.target)) {
       dropdown?.classList.add('hidden');
     }
-  });
+  };
+  document.addEventListener('click', dashboardOutsideClickHandler);
 
   // Settings link
   container.querySelector('#profile-goto-settings')?.addEventListener('click', () => {
@@ -202,6 +252,33 @@ export async function renderDashboard(container) {
       }
     });
   });
+
+  container.querySelector('#btn-open-strength')?.addEventListener('click', () => {
+    navigate('/strength');
+  });
+
+  container.querySelector('#btn-save-profile-setup')?.addEventListener('click', async () => {
+    const age = Number(container.querySelector('#profile-age')?.value || 0);
+    const gender = String(container.querySelector('#profile-gender')?.value || '').trim();
+    const heightCm = Number(container.querySelector('#profile-height')?.value || 0);
+    const weightKg = Number(container.querySelector('#profile-weight')?.value || 0);
+
+    if (!age || !gender || !heightCm || !weightKg) {
+      alert('Please enter age, gender, height, and weight.');
+      return;
+    }
+
+    await saveUserProfile({
+      ...profile,
+      age,
+      gender,
+      heightCm,
+      weightKg,
+      onboardingCompleted: true
+    });
+    await renderDashboard(container);
+  });
+
 }
 
 function renderNewCard(routine, imagePath, isGuide = false) {
@@ -231,4 +308,9 @@ function getTimeOfDay() {
   if (h < 12) return 'Morning';
   if (h < 17) return 'Afternoon';
   return 'Evening';
+}
+
+function getTodayGymDay() {
+  const dayIndex = (new Date().getDay() + 6) % 7; // Mon=0
+  return gymPlan.days[dayIndex] || gymPlan.days[0];
 }

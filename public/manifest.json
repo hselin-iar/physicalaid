@@ -1,0 +1,16 @@
+{
+    "name": "PhysicalAid",
+    "short_name": "PhysicalAid",
+    "start_url": "./",
+    "display": "standalone",
+    "background_color": "#000000",
+    "theme_color": "#000000",
+    "description": "Your daily exercise & posture correction companion.",
+    "icons": [
+        {
+            "src": "favicon.svg",
+            "type": "image/svg+xml",
+            "sizes": "any"
+        }
+    ]
+}

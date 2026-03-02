@@ -2,144 +2,258 @@
    PhysicalAid — Routines Overview Page
    ======================================== */
 
-import { allRoutines, nightMobility, walkingProtocol, standingCheckpoint, ExType, Sides } from '../data.js';
-import { isCompletedToday } from '../storage.js';
+import { allRoutines, nightMobility, walkingProtocol, standingCheckpoint, dailyResetFull } from '../data.js';
+import { isCompletedToday, getUserProfile, getSettings, getTodayPlan } from '../storage.js';
 import { navigate } from '../router.js';
+import { renderTodayPlanCard, bindTodayPlanActions } from '../components/todayPlan.js';
+import { getSmartReminderInsights } from '../reminders.js';
 
 export async function renderRoutines(container) {
-  const allSections = [
-    { group: 'Daily Reset', items: allRoutines },
-    { group: 'Quick Routines', items: [nightMobility] }
+  const [profile, settings, walkingDone, standingDone, todayPlan, reminderInsights] = await Promise.all([
+    getUserProfile(),
+    getSettings(),
+    isCompletedToday('walking'),
+    isCompletedToday('standing'),
+    getTodayPlan(),
+    getSmartReminderInsights()
+  ]);
+
+  const routineCatalog = [
+    { ...dailyResetFull, id: dailyResetFull.id, category: 'full' },
+    ...allRoutines.map(r => ({ ...r, category: 'daily' })),
+    { ...nightMobility, category: 'quick' }
   ];
 
-  // Pre-resolve completion status for guide items
-  const walkingDone = await isCompletedToday('walking');
-  const standingDone = await isCompletedToday('standing');
-
-  // Pre-resolve completion for all routines
-  const sectionMarkup = [];
-  for (const section of allSections) {
-    const routineMarkup = [];
-    for (const routine of section.items) {
-      routineMarkup.push(await renderRoutineBoutique(routine));
-    }
-    sectionMarkup.push(`
-      <div class="mb-12 animate-in">
-        <h2 class="flow-label mb-6" style="font-size: 1rem; border-bottom: 1px solid var(--border-glass); padding-bottom: 0.5rem">
-          ${section.group}
-        </h2>
-        ${routineMarkup.join('')}
-      </div>
-    `);
+  const completionMap = {};
+  for (const routine of routineCatalog) {
+    completionMap[routine.id] = await isCompletedToday(routine.id);
   }
 
+  const recommendation = getRecommendation(routineCatalog, completionMap, profile);
+
   container.innerHTML = `
-    <div class="mb-10 animate-in">
+    <div class="mb-8 animate-in">
       <h1 class="display-heading">Routines</h1>
-      <p class="text-muted" style="font-size: var(--fs-md)">Your complete body alignment library.</p>
+      <p class="text-muted" style="font-size: var(--fs-md)">Plan by time and focus, then start immediately.</p>
     </div>
 
-    <!-- Featured Master Routine -->
-    <div class="mb-12 animate-in">
-       <div class="routine-card-new" id="btn-full-reset" style="cursor:pointer; aspect-ratio: 21/7;">
-          <div class="card-image">
-            <img src="/images/exercises/thoracic_extension.png" style="opacity: 0.4">
-          </div>
-          <div class="card-content" style="padding: var(--sp-8)">
-            <div>
-              <div class="flow-label" style="color: #fff; opacity: 0.8;">Ultimate Alignment</div>
-              <h2 style="font-size: 2.2rem; font-weight: 800; color: #fff;">Full Daily Reset</h2>
-              <p class="text-muted" style="font-size: var(--fs-sm)">15–20 min • Complete structural overhaul</p>
-            </div>
-            <button class="btn-start-glass" style="padding: 1rem 2.5rem; font-size: 1rem;">▶ Start Master Routine</button>
-          </div>
-       </div>
+    <div class="mb-8 animate-in">
+      ${renderTodayPlanCard(todayPlan, { title: 'Shared Checklist', reminders: reminderInsights.messages })}
     </div>
 
-    ${sectionMarkup.join('')}
+    <div class="routine-reco-card animate-in mb-8">
+      <div>
+        <div class="flow-label" style="margin-bottom: 0.35rem;">Recommended For You</div>
+        <h2 style="font-size: 1.25rem; font-weight: 800; color: #fff; margin: 0;">${recommendation.title}</h2>
+        <p class="text-muted" style="font-size: 0.78rem; margin-top: 0.35rem;">${recommendation.reason}</p>
+      </div>
+      <button class="btn-start-glass" id="btn-start-recommended">▶ Start</button>
+    </div>
 
-    <!-- Mindful Practice (Non-Boxy) -->
-    <div class="mb-12 animate-in">
-      <h2 class="flow-label mb-6" style="font-size: 1rem; border-bottom: 1px solid var(--border-glass); padding-bottom: 0.5rem">
-        Mindful Practice
-      </h2>
-      <div class="flex flex-direction-column gap-4">
-        <div class="flex items-center justify-between p-4" data-guide="walking" style="cursor:pointer; background: var(--bg-card); border-radius: 20px; border: 1px solid var(--border-glass);">
-          <div class="flex items-center gap-4">
-            <span style="font-size: 2rem">${walkingProtocol.icon}</span>
-            <div>
-              <div style="font-weight: 700;">${walkingProtocol.title}</div>
-              <div class="text-muted" style="font-size: 0.75rem">${walkingProtocol.duration}</div>
-            </div>
-          </div>
-          ${walkingDone ? '<span class="badge badge-success">Done</span>' : '<span class="badge">Open Guide</span>'}
+    <div class="routine-planner animate-in mb-8">
+      <div style="display: grid; gap: var(--sp-3);">
+        <input id="routine-search" class="log-input" style="width: 100%;" placeholder="Search routines or exercises" />
+        <div class="routine-filter-row">
+          <select id="routine-time-filter" class="setting-select">
+            <option value="all">Any Duration</option>
+            <option value="short">Short (≤ 8 min)</option>
+            <option value="medium">Medium (9–12 min)</option>
+            <option value="long">Long (13+ min)</option>
+          </select>
+          <select id="routine-focus-filter" class="setting-select">
+            <option value="all">Any Focus</option>
+            <option value="posture">Posture</option>
+            <option value="mobility">Mobility</option>
+            <option value="strength">Strength Prep</option>
+          </select>
+          <button id="btn-reset-filters" class="btn btn-secondary" style="padding: 0.45rem 0.8rem;">Reset</button>
         </div>
-        <div class="flex items-center justify-between p-4" data-guide="standing" style="cursor:pointer; background: var(--bg-card); border-radius: 20px; border: 1px solid var(--border-glass);">
-          <div class="flex items-center gap-4">
-            <span style="font-size: 2rem">${standingCheckpoint.icon}</span>
-            <div>
-              <div style="font-weight: 700;">${standingCheckpoint.title}</div>
-              <div class="text-muted" style="font-size: 0.75rem">${standingCheckpoint.duration}</div>
-            </div>
-          </div>
-          ${standingDone ? '<span class="badge badge-success">Done</span>' : '<span class="badge">Open Guide</span>'}
-        </div>
+        <div class="text-muted" style="font-size: 0.72rem;">Tip: your rest timer is currently ${settings.restDuration}s, and walking timer is ${settings.walkingDuration} min.</div>
+      </div>
+    </div>
+
+    <div id="routine-library" class="routine-library-grid animate-in">
+      ${routineCatalog.map((routine) => renderRoutineCard(routine, completionMap[routine.id])).join('')}
+    </div>
+
+    <div class="mb-8 mt-8 animate-in">
+      <h2 class="flow-label mb-4" style="font-size: 0.95rem;">Mindful Practice</h2>
+      <div class="routine-guide-grid">
+        ${renderGuideCard(walkingProtocol, walkingDone, 'walking')}
+        ${renderGuideCard(standingCheckpoint, standingDone, 'standing')}
       </div>
     </div>
   `;
 
-  // Events
-  container.querySelector('#btn-full-reset')?.addEventListener('click', () => {
-    navigate('/player/daily-reset');
+  const startRecommended = container.querySelector('#btn-start-recommended');
+  startRecommended?.addEventListener('click', () => {
+    navigate('/player/' + recommendation.id);
   });
 
-  container.querySelectorAll('.start-routine-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
+  container.querySelectorAll('.btn-start-routine').forEach(btn => {
+    btn.addEventListener('click', () => {
       navigate('/player/' + btn.dataset.id);
     });
   });
 
-  container.querySelectorAll('[data-guide]').forEach(card => {
-    card.addEventListener('click', () => {
-      navigate('/guides/' + card.dataset.guide);
+  container.querySelectorAll('.btn-preview-routine').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.id;
+      const preview = container.querySelector(`#preview-${id}`);
+      if (!preview) return;
+      const isHidden = preview.classList.contains('hidden');
+      preview.classList.toggle('hidden');
+      btn.textContent = isHidden ? 'Hide Preview' : 'Preview';
     });
   });
+
+  container.querySelectorAll('[data-guide]').forEach(card => {
+    card.addEventListener('click', () => navigate('/guides/' + card.dataset.guide));
+  });
+
+  const applyFilters = () => {
+    const search = String(container.querySelector('#routine-search')?.value || '').toLowerCase().trim();
+    const timeFilter = container.querySelector('#routine-time-filter')?.value || 'all';
+    const focusFilter = container.querySelector('#routine-focus-filter')?.value || 'all';
+
+    container.querySelectorAll('.routine-library-item').forEach(item => {
+      const text = item.dataset.searchText || '';
+      const duration = Number(item.dataset.durationMin || 0);
+      const focus = item.dataset.focus || '';
+
+      const matchesSearch = !search || text.includes(search);
+      const matchesTime = (
+        timeFilter === 'all' ||
+        (timeFilter === 'short' && duration <= 8) ||
+        (timeFilter === 'medium' && duration >= 9 && duration <= 12) ||
+        (timeFilter === 'long' && duration >= 13)
+      );
+      const matchesFocus = focusFilter === 'all' || focus === focusFilter;
+
+      item.classList.toggle('hidden', !(matchesSearch && matchesTime && matchesFocus));
+    });
+  };
+
+  container.querySelector('#routine-search')?.addEventListener('input', applyFilters);
+  container.querySelector('#routine-time-filter')?.addEventListener('change', applyFilters);
+  container.querySelector('#routine-focus-filter')?.addEventListener('change', applyFilters);
+  container.querySelector('#btn-reset-filters')?.addEventListener('click', () => {
+    container.querySelector('#routine-search').value = '';
+    container.querySelector('#routine-time-filter').value = 'all';
+    container.querySelector('#routine-focus-filter').value = 'all';
+    applyFilters();
+  });
+
+  bindTodayPlanActions(container);
 }
 
-async function renderRoutineBoutique(routine) {
-  const done = await isCompletedToday(routine.id);
-  const exercises = routine.exercises || [];
+function renderRoutineCard(routine, doneToday) {
+  const exercises = getRoutineExercises(routine);
+  const durationMin = estimateDurationMin(routine.duration);
+  const focus = getRoutineFocus(routine.title);
+  const searchText = `${routine.title} ${exercises.map(ex => ex.name).join(' ')}`.toLowerCase();
 
   return `
-    <div class="mb-10">
-      <div class="flex items-center justify-between mb-6">
-        <div class="flex items-center gap-4">
-          <div>
-            <h3 style="font-size: 1.3rem; font-weight: 900; margin: 0;">${routine.title}</h3>
-            <div class="text-muted" style="font-size: 0.75rem">${routine.duration} • ${exercises.length} exercises</div>
-          </div>
+    <div
+      class="routine-library-item"
+      data-search-text="${escapeAttr(searchText)}"
+      data-duration-min="${durationMin}"
+      data-focus="${focus}"
+    >
+      <div class="routine-library-card">
+        <div class="flex items-center justify-between mb-3" style="gap: var(--sp-2);">
+          <h3 style="font-size: 1rem; font-weight: 800; color: #fff; margin: 0;">${routine.title}</h3>
+          ${doneToday ? '<span class="badge badge-success">Done</span>' : '<span class="badge">Pending</span>'}
         </div>
-        <button class="btn-start-glass start-routine-btn" data-id="${routine.id}">▶ Start</button>
+        <div class="text-muted" style="font-size: 0.74rem; margin-bottom: var(--sp-3);">
+          ${routine.duration} · ${exercises.length} exercises · ${capitalize(focus)}
+        </div>
+        <div class="routine-chip-row">
+          ${exercises.slice(0, 3).map(ex => `<span class="routine-chip">${ex.emoji || '•'} ${ex.name}</span>`).join('')}
+          ${exercises.length > 3 ? `<span class="routine-chip">+${exercises.length - 3} more</span>` : ''}
+        </div>
+        <div class="flex gap-2 mt-4">
+          <button class="btn-start-glass btn-start-routine" data-id="${routine.id}" style="flex: 1;">▶ Start</button>
+          <button class="btn btn-secondary btn-preview-routine" data-id="${routine.id}" style="padding: 0.45rem 0.8rem;">Preview</button>
+        </div>
       </div>
-      
-      <!-- Horizontal Exercise Flow -->
-      <div class="horizontal-scroll-container" style="padding-right: 40px;">
-        ${exercises.map((ex, i) => `
-          <div class="horizontal-item" style="background: var(--bg-card); padding: var(--sp-5); border-radius: 20px; border: 1px solid var(--border-glass); display: flex; flex-direction: column; justify-content: space-between; min-height: 140px;">
-            <div>
-              <div class="flex items-center gap-3 mb-3">
-                 <span style="font-size: 1.5rem">${ex.emoji}</span>
-                 <div style="font-weight: 700; font-size: 0.95rem; line-height: 1.2; color: #fff;">${ex.name}</div>
-              </div>
-              <div class="text-muted" style="font-size: 0.75rem; line-height: 1.4; margin-bottom: var(--sp-3)">${ex.purpose}</div>
-            </div>
-            <div style="font-size: 0.7rem; font-weight: 800; color: var(--text-accent); text-transform: uppercase; letter-spacing: 0.05em;">
-              ${ex.sets} × ${ex.type === ExType.TIMED ? ex.duration + 's' : ex.reps + ' reps'}
+      <div id="preview-${routine.id}" class="hidden routine-preview-panel">
+        ${exercises.map(ex => `
+          <div class="routine-preview-item">
+            <span style="font-size: 0.9rem">${ex.emoji || '•'}</span>
+            <div style="flex: 1;">
+              <div style="font-size: 0.8rem; font-weight: 700; color: #fff;">${ex.name}</div>
+              <div class="text-muted" style="font-size: 0.7rem;">${ex.sets} sets · ${ex.duration ? `${ex.duration}s` : `${ex.reps} reps`}</div>
             </div>
           </div>
         `).join('')}
       </div>
     </div>
   `;
+}
+
+function renderGuideCard(guide, done, key) {
+  return `
+    <div class="routine-guide-card" data-guide="${key}">
+      <div class="flex items-center gap-3">
+        <span style="font-size: 1.6rem">${guide.icon}</span>
+        <div>
+          <div style="font-size: 0.9rem; font-weight: 700; color: #fff;">${guide.title}</div>
+          <div class="text-muted" style="font-size: 0.72rem;">${guide.duration}</div>
+        </div>
+      </div>
+      <span class="badge ${done ? 'badge-success' : ''}">${done ? 'Done' : 'Open Guide'}</span>
+    </div>
+  `;
+}
+
+function getRecommendation(routines, completionMap, profile) {
+  const goal = profile?.goalFocus || 'posture';
+  const ordered = [...routines];
+
+  ordered.sort((a, b) => {
+    const aDone = completionMap[a.id] ? 1 : 0;
+    const bDone = completionMap[b.id] ? 1 : 0;
+    return aDone - bDone;
+  });
+
+  const match = ordered.find((routine) => getRoutineFocus(routine.title) === goal) || ordered[0];
+  const reasonMap = {
+    posture: 'Chosen for alignment and posture carryover.',
+    mobility: 'Chosen to improve range of motion and reduce tightness.',
+    strength: 'Chosen to support strength work with better movement quality.'
+  };
+
+  return {
+    id: match.id,
+    title: match.title,
+    reason: reasonMap[goal] || reasonMap.posture
+  };
+}
+
+function getRoutineExercises(routine) {
+  if (routine.sections?.length) {
+    return routine.sections.flatMap(section => section.exercises || []);
+  }
+  return routine.exercises || [];
+}
+
+function estimateDurationMin(durationLabel = '') {
+  const firstNum = Number((durationLabel.match(/\d+/) || [10])[0]);
+  return firstNum || 10;
+}
+
+function getRoutineFocus(title = '') {
+  const t = title.toLowerCase();
+  if (t.includes('mobility') || t.includes('night')) return 'mobility';
+  if (t.includes('full') || t.includes('reset') || t.includes('alignment')) return 'posture';
+  return 'strength';
+}
+
+function escapeAttr(text) {
+  return String(text).replace(/"/g, '&quot;');
+}
+
+function capitalize(value) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }

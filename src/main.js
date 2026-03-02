@@ -6,6 +6,7 @@ import './style.css';
 import { registerRoute, initRouter, navigate } from './js/router.js';
 import { onAuthChange } from './js/firebase.js';
 import { onUserChanged } from './js/storage.js';
+import { startReminderLoop, stopReminderLoop } from './js/reminders.js';
 import { renderDashboard } from './js/pages/dashboard.js';
 import { renderPlayer } from './js/pages/player.js';
 import { renderRoutines } from './js/pages/routines.js';
@@ -44,10 +45,12 @@ onAuthChange((user) => {
 
       // Update user profile in sidebar
       updateSidebarProfile(user);
+      startReminderLoop();
    } else {
       // Hide sidebar & bottom nav when not logged in
       document.getElementById('sidebar')?.classList.add('hidden');
       document.getElementById('bottom-nav')?.classList.add('hidden');
+      stopReminderLoop();
    }
 
    if (!routerInitialized) {
@@ -97,3 +100,25 @@ function updateSidebarProfile(user) {
 }
 
 console.log('⚡ PhysicalAid loaded');
+
+if ('serviceWorker' in navigator) {
+   window.addEventListener('load', async () => {
+      try {
+         if (import.meta.env.PROD) {
+            await navigator.serviceWorker.register('/sw.js');
+            return;
+         }
+
+         // In local development, ensure old workers are fully removed.
+         const regs = await navigator.serviceWorker.getRegistrations();
+         await Promise.all(regs.map((reg) => reg.unregister()));
+
+         if ('caches' in window) {
+            const cacheKeys = await caches.keys();
+            await Promise.all(cacheKeys.map((key) => caches.delete(key)));
+         }
+      } catch (error) {
+         console.error('Service worker setup failed:', error);
+      }
+   });
+}

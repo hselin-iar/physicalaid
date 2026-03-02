@@ -179,7 +179,7 @@ export const hipGlute = {
       sides: Sides.NONE,
       purpose: 'Prevents excessive shoulder swing',
       muscle: 'Core',
-      image: '/images/exercises/plank.png',
+      image: '/images/exercises/dead_bug.png',
       emoji: '🧱',
       steps: [
         'Forearms on the floor, elbows under shoulders',
@@ -389,8 +389,8 @@ export const gymPlan = {
   id: 'gym-plan',
   title: 'Gym Plan for Beginners',
   icon: '🏆',
-  frequency: '4 days/week (Mon, Tue, Thu, Fri)',
-  note: 'Start with 3 sets of 8–12 reps. Focus on form, not weight.',
+  frequency: '4 strength + 3 mobility days/week',
+  note: 'Strength days: 3 sets of 8–12 reps. Gap days: mobility + recovery.',
   specificTips: [
     { label: 'Thin legs', tip: 'Prioritize squats, deadlifts, lunges (2x per week)' },
     { label: 'Posture', tip: 'Face pulls, rows, rear delt work (every upper day)' },
@@ -400,28 +400,8 @@ export const gymPlan = {
     {
       day: 'Monday',
       dayShort: 'Mon',
-      focus: 'Upper Push',
-      image: '/images/exercises/gym-plan.png',
-      emoji: '💪',
-      exercises: [
-        {
-          id: 'bench-press', name: 'Bench Press',
-          image: '/images/exercises/bench_press.png', emoji: '🏋️'
-        },
-        {
-          id: 'overhead-press', name: 'Overhead Press',
-          image: '/images/exercises/overload_press.png', emoji: '🏋️'
-        },
-        {
-          id: 'tricep-dips', name: 'Tricep Dips',
-          image: '/images/exercises/tricep_dips.png', emoji: '💪'
-        }
-      ]
-    },
-    {
-      day: 'Tuesday',
-      dayShort: 'Tue',
       focus: 'Lower Body',
+      image: '/images/exercises/squats.png',
       emoji: '🦵',
       exercises: [
         {
@@ -434,7 +414,7 @@ export const gymPlan = {
         },
         {
           id: 'calf-raises-gym', name: 'Calf Raises',
-          image: '/images/exercises/calf-raises-gym.png', emoji: '⬆️'
+          image: '/images/exercises/calf_raises_gym.png', emoji: '⬆️'
         },
         {
           id: 'lunges', name: 'Lunges',
@@ -443,17 +423,17 @@ export const gymPlan = {
       ]
     },
     {
-      day: 'Wednesday',
-      dayShort: 'Wed',
-      focus: 'Rest / Posture Work',
+      day: 'Tuesday',
+      dayShort: 'Tue',
+      focus: 'Gap Day (Mobility focus)',
       emoji: '🧘',
       exercises: [],
       isRest: true,
-      note: 'Your daily mobility routine'
+      note: 'Mobility routine, light walk, and recovery work'
     },
     {
-      day: 'Thursday',
-      dayShort: 'Thu',
+      day: 'Wednesday',
+      dayShort: 'Wed',
       focus: 'Upper Pull',
       emoji: '🚣',
       exercises: [
@@ -476,6 +456,15 @@ export const gymPlan = {
       ]
     },
     {
+      day: 'Thursday',
+      dayShort: 'Thu',
+      focus: 'Gap Day (Mobility focus)',
+      emoji: '🧘',
+      exercises: [],
+      isRest: true,
+      note: 'Mobility routine, posture reset, and easy cardio'
+    },
+    {
       day: 'Friday',
       dayShort: 'Fri',
       focus: 'Lower Body',
@@ -487,22 +476,43 @@ export const gymPlan = {
         },
         {
           id: 'leg-press', name: 'Leg Press',
-          image: '/images/exercises/leg-press.png', emoji: '🦵'
+          image: '/images/exercises/leg_press.png', emoji: '🦵'
         },
         {
           id: 'bulgarian-split-squats', name: 'Bulgarian Split Squats',
-          image: '/images/exercises/bulgarian-split-squats.png', emoji: '🚶'
+          image: '/images/exercises/bulgarian_split_squats.png', emoji: '🚶'
         }
       ]
     },
     {
-      day: 'Saturday–Sunday',
-      dayShort: 'Sat–Sun',
-      focus: 'Rest',
-      emoji: '😴',
+      day: 'Saturday',
+      dayShort: 'Sat',
+      focus: 'Gap Day (Mobility focus)',
+      emoji: '🧘',
       exercises: [],
       isRest: true,
-      note: 'Walk, stretch, active recovery'
+      note: 'Longer mobility block and active recovery'
+    },
+    {
+      day: 'Sunday',
+      dayShort: 'Sun',
+      focus: 'Upper Push',
+      image: '/images/exercises/bench_press.png',
+      emoji: '💪',
+      exercises: [
+        {
+          id: 'bench-press', name: 'Bench Press',
+          image: '/images/exercises/bench_press.png', emoji: '🏋️'
+        },
+        {
+          id: 'overhead-press', name: 'Overhead Press',
+          image: '/images/exercises/overload_press.png', emoji: '🏋️'
+        },
+        {
+          id: 'tricep-dips', name: 'Tricep Dips',
+          image: '/images/exercises/tricep_dips.png', emoji: '💪'
+        }
+      ]
     }
   ]
 };

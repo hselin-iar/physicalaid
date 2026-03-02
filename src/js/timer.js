@@ -18,7 +18,9 @@ let state = {
     repCount: 0,
     targetReps: 0,
     isResting: false,
+    isTransitioning: false,
     intervalId: null,
+    transitionTimeout: null,
     onUpdate: null,      // callback for UI updates
     onComplete: null,    // callback when routine finishes
     cachedSettings: null // settings cached at routine start
@@ -95,6 +97,7 @@ function startCurrentExercise() {
 
     state.totalSets = ex.sets;
     state.isResting = false;
+    state.isTransitioning = false;
 
     if (ex.type === ExType.TIMED) {
         state.timeRemaining = getEffectiveDuration(ex);
@@ -153,7 +156,8 @@ function startTimer() {
 
 // Called when user taps the rep button
 export function countRep() {
-    if (!state.running || state.isResting) return;
+    if (!state.running || state.isResting || state.isTransitioning) return;
+    if (state.repCount >= state.targetReps) return;
 
     const ex = state.exercises[state.currentIndex];
     if (ex.type !== ExType.REPS) return;
@@ -205,30 +209,40 @@ function advanceAfterSet() {
 }
 
 function advanceToNextExercise(immediate = false) {
-    clearTimeout(state.transitionTimeout);
-    state.currentIndex++;
-    state.currentSet = 1;
+    if (state.isTransitioning && !immediate) return;
 
-    if (state.currentIndex >= state.exercises.length) {
+    clearTimeout(state.transitionTimeout);
+    state.isTransitioning = true;
+
+    // Counter/timer reset happens immediately for the CURRENT UI view
+    state.repCount = 0;
+    state.timeRemaining = 0;
+
+    if (state.currentIndex + 1 >= state.exercises.length) {
+        state.currentIndex++;
         finishRoutine();
     } else {
-        // Navigate immediately or with delay
         if (immediate) {
+            state.currentIndex++;
+            state.currentSet = 1;
+            state.isTransitioning = false;
             if (state.running) {
                 const settings = state.cachedSettings;
                 if (settings.soundEnabled) audio.playStart();
                 startCurrentExercise();
             }
         } else {
-            // Brief pause before next exercise (auto-advance)
+            fireUpdate(); // Update UI to show completion state (e.g. 10/10)
             state.transitionTimeout = setTimeout(() => {
+                state.currentIndex++;
+                state.currentSet = 1;
+                state.isTransitioning = false;
                 if (state.running) {
                     const settings = state.cachedSettings;
                     if (settings.soundEnabled) audio.playStart();
                     startCurrentExercise();
                 }
             }, 1500);
-            fireUpdate();
         }
     }
 }
@@ -257,32 +271,36 @@ async function finishRoutine() {
 
 // ─── Controls ───
 export function pauseResume() {
-    if (!state.running) return;
+    if (!state.running || state.isTransitioning) return;
     state.paused = !state.paused;
     fireUpdate();
 }
 
 export function skipExercise() {
-    if (!state.running) return;
+    if (!state.running || state.isTransitioning) return;
     clearInterval(state.intervalId);
-    advanceToNextExercise();
+    advanceToNextExercise(true); // Immediate skip when requested by user
+}
+
+export function skipRest() {
+    if (!state.running || !state.isResting || state.isTransitioning) return;
+    clearInterval(state.intervalId);
+    state.isResting = false;
+    advanceAfterSet();
 }
 
 export function previousExercise() {
-    if (!state.running) return;
+    if (!state.running || state.isTransitioning) return;
     if (state.currentIndex === 0 && state.currentSet === 1) return; // Already at start
 
     clearInterval(state.intervalId);
 
     // Logic: Go to start of previous exercise. 
-    // Ideally we should go to previous exercise index.
     if (state.currentIndex > 0) {
         state.currentIndex--;
         state.currentSet = 1;
         startCurrentExercise();
     } else {
-        // If at index 0 but later set?
-        // Let's just restart the current exercise if at index 0
         state.currentSet = 1;
         startCurrentExercise();
     }
